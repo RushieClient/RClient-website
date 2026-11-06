@@ -401,6 +401,60 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcDiscordRPC, RCLocalize("Discord RPC", "RClient"), &g_Config.m_TcDiscordRPC, &Column, LineSize);
+	if(g_Config.m_TcDiscordRPC)
+	{
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcDiscordCustom, RCLocalize("Customize Discord RPC", "RClient"), &g_Config.m_RcDiscordCustom, &Column, LineSize);
+		CUIRect DiscordSettings;
+		Column.HSplitTop(LineSize * 12 + 2.0f, &DiscordSettings, &Column);
+		if(g_Config.m_RcDiscordCustom)
+		{
+			DiscordSettings.HSplitTop(LineSize, &Label, &DiscordSettings);
+			Ui()->DoLabel(&Label, RCLocalize("In game", "RClient"), FontSize, TEXTALIGN_ML);
+
+			static CLineInput s_DiscordDetails(g_Config.m_RcDiscordDetails, sizeof(g_Config.m_RcDiscordDetails));
+			DiscordSettings.HSplitTop(LineSize, &Button, &DiscordSettings);
+			Button.VSplitMid(&Label, &Button);
+			Ui()->DoLabel(&Label, RCLocalize("First line", "RClient"), FontSize, TEXTALIGN_ML);
+			Ui()->DoEditBox(&s_DiscordDetails, &Button, EditBoxFontSize);
+
+			static CLineInput s_DiscordState(g_Config.m_RcDiscordState, sizeof(g_Config.m_RcDiscordState));
+			DiscordSettings.HSplitTop(LineSize, &Button, &DiscordSettings);
+			Button.VSplitMid(&Label, &Button);
+			Ui()->DoLabel(&Label, RCLocalize("Second line", "RClient"), FontSize, TEXTALIGN_ML);
+			Ui()->DoEditBox(&s_DiscordState, &Button, EditBoxFontSize);
+
+			DiscordSettings.HSplitTop(LineSize, &Label, &DiscordSettings);
+			Ui()->DoLabel(&Label, RCLocalize("In menu", "RClient"), FontSize, TEXTALIGN_ML);
+
+			static CLineInput s_DiscordMenuDetails(g_Config.m_RcDiscordMenuDetails, sizeof(g_Config.m_RcDiscordMenuDetails));
+			DiscordSettings.HSplitTop(LineSize, &Button, &DiscordSettings);
+			Button.VSplitMid(&Label, &Button);
+			Ui()->DoLabel(&Label, RCLocalize("First line", "RClient"), FontSize, TEXTALIGN_ML);
+			Ui()->DoEditBox(&s_DiscordMenuDetails, &Button, EditBoxFontSize);
+
+			static CLineInput s_DiscordMenuState(g_Config.m_RcDiscordMenuState, sizeof(g_Config.m_RcDiscordMenuState));
+			DiscordSettings.HSplitTop(LineSize, &Button, &DiscordSettings);
+			Button.VSplitMid(&Label, &Button);
+			Ui()->DoLabel(&Label, RCLocalize("Second line", "RClient"), FontSize, TEXTALIGN_ML);
+			Ui()->DoEditBox(&s_DiscordMenuState, &Button, EditBoxFontSize);
+
+			DiscordSettings.HSplitTop(LineSize, &Label, &DiscordSettings);
+			Ui()->DoLabel(&Label, "{server}, {map}, {players}, {max_players}", EditBoxFontSize, TEXTALIGN_ML);
+			DiscordSettings.HSplitTop(LineSize, &Label, &DiscordSettings);
+			Ui()->DoLabel(&Label, "{player}, {status}, {team}", EditBoxFontSize, TEXTALIGN_ML);
+			DiscordSettings.HSplitTop(LineSize, &Label, &DiscordSettings);
+			Ui()->DoLabel(&Label, "{team_players}, {max_team_players}", EditBoxFontSize, TEXTALIGN_ML);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcDiscordShowTime, RCLocalize("Show elapsed time", "RClient"), &g_Config.m_RcDiscordShowTime, &DiscordSettings, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcDiscordAllowJoin, RCLocalize("Allow joining", "RClient"), &g_Config.m_RcDiscordAllowJoin, &DiscordSettings, LineSize);
+			static std::vector<CButtonContainer> s_vDiscordPartyButtons = {{}, {}, {}};
+			DoLine_RadioMenu(DiscordSettings, RCLocalize("Party counter", "RClient"),
+				s_vDiscordPartyButtons,
+				{RCLocalize("Server", "RClient"), RCLocalize("My team", "RClient"), RCLocalize("Hidden", "RClient")},
+				{0, 1, 2},
+				g_Config.m_RcDiscordParty);
+		}
+	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcSteam, RCLocalize("Steam", "RClient"), &g_Config.m_RcSteam, &Column, LineSize);
 
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);

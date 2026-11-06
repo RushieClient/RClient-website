@@ -2295,7 +2295,19 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 
 	if(Client()->State() == IClient::STATE_ONLINE)
 	{
-		m_pDiscord->UpdatePlayerCount(m_Snap.m_NumPlayers);
+		int Team = -1;
+		int TeamPlayers = 0;
+		const int LocalId = m_Snap.m_LocalClientId;
+		if(m_GameInfo.m_DDRaceTeam && LocalId >= 0 && m_Snap.m_apPlayerInfos[LocalId] && m_aClients[LocalId].m_Team != TEAM_SPECTATORS && !m_aClients[LocalId].m_Spec)
+		{
+			Team = m_Teams.Team(LocalId);
+			for(int i = 0; i < MAX_CLIENTS; ++i)
+			{
+				if(m_Snap.m_apPlayerInfos[i] && m_aClients[i].m_Team != TEAM_SPECTATORS && !m_aClients[i].m_Spec && m_Teams.Team(i) == Team)
+					++TeamPlayers;
+			}
+		}
+		m_pDiscord->UpdatePlayerCount(m_Snap.m_NumPlayers, Team, TeamPlayers, MaxTeamSize());
 	}
 
 	for(int i = 0; i < MAX_CLIENTS; ++i)

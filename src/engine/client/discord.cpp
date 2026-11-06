@@ -9,7 +9,11 @@
 #include <engine/discord.h>
 
 #if defined(CONF_DISCORD)
+#include <engine/shared/config.h>
+
+#define IStorage IWindowsStorage
 #include <discord_game_sdk.h>
+#undef IStorage
 
 typedef enum EDiscordResult(DISCORD_API *FDiscordCreate)(DiscordVersion, struct DiscordCreateParams *, struct IDiscordCore **);
 
@@ -31,9 +35,40 @@ static FDiscordCreate GetDiscordCreate()
 }
 #endif
 
+static void FormatDiscordTemplate(const char *pTemplate, char *pOutput, int OutputSize, const char *const *ppValues)
+{
+	const char *apTags[] = {"{server}", "{map}", "{players}", "{max_players}", "{player}", "{status}", "{team}", "{team_players}", "{max_team_players}"};
+	int Length = 0;
+	for(const char *p = pTemplate; *p && Length < OutputSize - 1;)
+	{
+		const char *pValue = p;
+		int ValueLength = 1;
+		int Advance = 1;
+		for(int Tag = 0; Tag < 9; ++Tag)
+		{
+			if(str_startswith(p, apTags[Tag]))
+			{
+				pValue = ppValues[Tag];
+				ValueLength = str_length(pValue);
+				Advance = str_length(apTags[Tag]);
+				break;
+			}
+		}
+		for(int i = 0; i < ValueLength && Length < OutputSize - 1; ++i)
+			pOutput[Length++] = pValue[i];
+		p += Advance;
+	}
+	pOutput[Length] = '\0';
+	str_utf8_fix_truncation(pOutput);
+}
+
 class CDiscord : public IDiscord
 {
 	DiscordActivity m_Activity;
+	DiscordActivity m_LastSentActivity = {};
+	int m_Team = -1;
+	int m_TeamPlayers = 0;
+	int m_MaxTeamPlayers = 0;
 	bool m_UpdateActivity = false;
 	int64_t m_LastActivityUpdate = 0;
 
@@ -107,12 +142,44 @@ public:
 		if(m_pCore && m_Enabled)
 		{
 			// update every 5 seconds, rate limit is 5 updates per 20 seconds
-			if(m_UpdateActivity && time_get() > m_LastActivityUpdate + time_freq() * 5)
+			if(time_get() > m_LastActivityUpdate + time_freq() * 5)
 			{
-				m_UpdateActivity = false;
 				m_LastActivityUpdate = time_get();
-
-				m_pActivityManager->update_activity(m_pActivityManager, &m_Activity, nullptr, nullptr);
+				DiscordActivity Activity = m_Activity;
+				if(g_Config.m_RcDiscordCustom)
+				{
+					const bool Online = m_Activity.instance;
+					char aPlayers[16], aMaxPlayers[16], aTeam[16], aTeamPlayers[16], aMaxTeamPlayers[16];
+					str_format(aPlayers, sizeof(aPlayers), "%d", m_Activity.party.size.current_size);
+					str_format(aMaxPlayers, sizeof(aMaxPlayers), "%d", m_Activity.party.size.max_size);
+					str_format(aTeam, sizeof(aTeam), "%d", m_Team);
+					str_format(aTeamPlayers, sizeof(aTeamPlayers), "%d", m_TeamPlayers);
+					str_format(aMaxTeamPlayers, sizeof(aMaxTeamPlayers), "%d", m_MaxTeamPlayers);
+					const char *apValues[] = {
+						Online ? m_Activity.details : "", Online ? m_Activity.state : "",
+						Online ? aPlayers : "", Online ? aMaxPlayers : "",
+						Kernel()->RequestInterface<IClient>()->PlayerName(), Online ? "Online" : "Offline",
+						Online && m_Team >= 0 ? aTeam : "", Online && m_Team >= 0 ? aTeamPlayers : "", Online && m_Team >= 0 ? aMaxTeamPlayers : ""};
+					FormatDiscordTemplate(Online ? g_Config.m_RcDiscordDetails : g_Config.m_RcDiscordMenuDetails, Activity.details, sizeof(Activity.details), apValues);
+					FormatDiscordTemplate(Online ? g_Config.m_RcDiscordState : g_Config.m_RcDiscordMenuState, Activity.state, sizeof(Activity.state), apValues);
+					if(!g_Config.m_RcDiscordShowTime)
+						mem_zero(&Activity.timestamps, sizeof(Activity.timestamps));
+					if(g_Config.m_RcDiscordParty == 2 || (g_Config.m_RcDiscordParty == 1 && (m_Team < 0 || m_TeamPlayers <= 0 || m_MaxTeamPlayers < m_TeamPlayers)))
+						mem_zero(&Activity.party.size, sizeof(Activity.party.size));
+					else if(Online && g_Config.m_RcDiscordParty == 1)
+					{
+						Activity.party.size.current_size = m_TeamPlayers;
+						Activity.party.size.max_size = m_MaxTeamPlayers;
+					}
+					if(!g_Config.m_RcDiscordAllowJoin)
+						mem_zero(&Activity.secrets, sizeof(Activity.secrets));
+				}
+				if(m_UpdateActivity || mem_comp(&Activity, &m_LastSentActivity, sizeof(Activity)) != 0)
+				{
+					m_UpdateActivity = false;
+					m_LastSentActivity = Activity;
+					m_pActivityManager->update_activity(m_pActivityManager, &Activity, nullptr, nullptr);
+				}
 			}
 
 			m_pCore->run_callbacks(m_pCore);
@@ -122,6 +189,9 @@ public:
 	void ClearGameInfo() override
 	{
 		mem_zero(&m_Activity, sizeof(DiscordActivity));
+		m_Team = -1;
+		m_TeamPlayers = 0;
+		m_MaxTeamPlayers = 0;
 
 		str_copy(m_Activity.assets.large_image, "rclient_logo");
 		str_copy(m_Activity.assets.large_text, "RClient logo");
@@ -135,6 +205,9 @@ public:
 	void SetGameInfo(const CServerInfo &ServerInfo, bool Registered) override
 	{
 		mem_zero(&m_Activity, sizeof(DiscordActivity));
+		m_Team = -1;
+		m_TeamPlayers = 0;
+		m_MaxTeamPlayers = 0;
 
 		str_copy(m_Activity.assets.large_image, "rclient_logo");
 		str_copy(m_Activity.assets.large_text, "RClient logo");
@@ -174,15 +247,18 @@ public:
 		m_UpdateActivity = true;
 	}
 
-	void UpdatePlayerCount(int Count) override
+	void UpdatePlayerCount(int Count, int Team, int TeamPlayers, int MaxTeamPlayers) override
 	{
 		if(!m_Activity.instance)
 			return;
 
-		if(m_Activity.party.size.current_size == Count)
+		if(m_Activity.party.size.current_size == Count && m_Team == Team && m_TeamPlayers == TeamPlayers && m_MaxTeamPlayers == MaxTeamPlayers)
 			return;
 
 		m_Activity.party.size.current_size = Count;
+		m_Team = Team;
+		m_TeamPlayers = TeamPlayers;
+		m_MaxTeamPlayers = MaxTeamPlayers;
 		m_UpdateActivity = true;
 	}
 
@@ -255,7 +331,7 @@ class CDiscordStub : public IDiscord
 	void ClearGameInfo() override {}
 	void SetGameInfo(const CServerInfo &ServerInfo, bool Registered) override {}
 	void UpdateServerInfo(const CServerInfo &ServerInfo) override {}
-	void UpdatePlayerCount(int Count) override {}
+	void UpdatePlayerCount(int Count, int Team, int TeamPlayers, int MaxTeamPlayers) override {}
 };
 
 IDiscord *CreateDiscord()

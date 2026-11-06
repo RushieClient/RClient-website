@@ -143,6 +143,14 @@ MACRO_CONFIG_INT(RcChatShowScrollbar, rc_chat_scrollbar, 1, 0, 1, CFGFLAG_CLIENT
 
 // Integration
 MACRO_CONFIG_INT(RcSteam, rc_steam, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable steam integration")
+MACRO_CONFIG_INT(RcDiscordCustom, rc_discord_custom, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Customize Discord RPC")
+MACRO_CONFIG_STR(RcDiscordDetails, rc_discord_details, 256, "{server}", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Discord RPC first line template")
+MACRO_CONFIG_STR(RcDiscordState, rc_discord_state, 256, "{map}", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Discord RPC second line template")
+MACRO_CONFIG_STR(RcDiscordMenuDetails, rc_discord_menu_details, 256, "{status}", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Discord RPC first line template in menu")
+MACRO_CONFIG_STR(RcDiscordMenuState, rc_discord_menu_state, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Discord RPC second line template in menu")
+MACRO_CONFIG_INT(RcDiscordShowTime, rc_discord_show_time, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Discord RPC elapsed time")
+MACRO_CONFIG_INT(RcDiscordAllowJoin, rc_discord_allow_join, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Allow joining through Discord RPC")
+MACRO_CONFIG_INT(RcDiscordParty, rc_discord_party, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Discord RPC party: 0=server, 1=DDRace team, 2=hidden")
 
 // Aspect Ratio
 MACRO_CONFIG_INT(RcCustomAspectEnabled, rc_custom_aspect_enabled, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom aspect ratio")
