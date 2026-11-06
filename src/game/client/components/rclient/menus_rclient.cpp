@@ -645,7 +645,7 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_HELP_TABS, s_aPageTabs, s_CurHelpCustomTab, LineSize);
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		const float MBiggestTab = LineSize * 12.0f + LineSize + (LineSize + 2.0f) * 2.0f + MarginSmall;
+		const float MBiggestTab = LineSize * 13.0f + LineSize + (LineSize + 2.0f) * 2.0f + MarginSmall;
 		const float MCurrentY = Column.y;
 
 		if(s_CurHelpCustomTab == HELP_TAB_MAIN)
@@ -690,6 +690,8 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 			static CButtonContainer s_HookLineContinueColor, s_HookLineContinuePlayerColor;
 			DoButton_ColorPickerAutoVMargin(&s_HookLineContinueColor, RCLocalize("Continue hook line after hit block", "RClient"), &g_Config.m_RcHookLineContinueColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RcHookLineContinueColor)), &Column, LineSize, true, &g_Config.m_RcContinueHookLine);
 			DoButton_ColorPickerAutoVMargin(&s_HookLineContinuePlayerColor, RCLocalize("Continue hook line after hit player", "RClient"), &g_Config.m_RcHookLinePlayerContinueColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RcHookLinePlayerContinueColor)), &Column, LineSize, true, &g_Config.m_RcContinuePlayerHookLine);
+			Column.HSplitTop(LineSize, &Button, &Column);
+			Ui()->DoScrollbarOption(&g_Config.m_RcHookthroughAlpha, &g_Config.m_RcHookthroughAlpha, &Button, RCLocalize("Hookthrough opacity (100 = off)", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcSendSpecPlPos, RCLocalize("Can send spec target pos in !sendpos", "RClient"), &g_Config.m_RcSendSpecPlPos, &Column, LineSize);
 		}
 

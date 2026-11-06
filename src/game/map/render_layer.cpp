@@ -1489,13 +1489,93 @@ IGraphics::CTextureHandle CRenderLayerEntityBase::GetTexture() const
 }
 
 // GAME
-CRenderLayerEntityGame::CRenderLayerEntityGame(int GroupId, int LayerId, int Flags, CMapItemLayerTilemap *pLayerTilemap) :
-	CRenderLayerEntityBase(GroupId, LayerId, Flags, pLayerTilemap) {}
+CRenderLayerEntityGame::CRenderLayerEntityGame(int GroupId, int LayerId, int Flags, CMapItemLayerTilemap *pLayerTilemap, const CMapItemLayerTilemap *pFrontLayer) :
+	CRenderLayerEntityBase(GroupId, LayerId, Flags, pLayerTilemap),
+	m_pFrontLayer(pFrontLayer) {}
 
 void CRenderLayerEntityGame::Init()
 {
 	InitCallback();
+	RebuildTileData();
+}
+
+void CRenderLayerEntityGame::RebuildTileData()
+{
+	Unload();
+	m_HookthroughEnabled = g_Config.m_RcHookthroughAlpha < 100;
+	const int Width = m_pLayerTilemap->m_Width;
+	const int Height = m_pLayerTilemap->m_Height;
+	if(m_HookthroughEnabled)
+	{
+		const CTile *pFront = m_pFrontLayer ? static_cast<CTile *>(m_pMap->GetData(m_pFrontLayer->m_Front)) : nullptr;
+		const size_t FrontTileCount = m_pFrontLayer ? (size_t)m_pFrontLayer->m_Width * m_pFrontLayer->m_Height : 0;
+		for(int y = 0; y < Height; ++y)
+		{
+			for(int x = 0; x < Width; ++x)
+			{
+				const size_t Index = (size_t)y * Width + x;
+				if(m_pTiles[Index].m_Index != TILE_SOLID && m_pTiles[Index].m_Index != TILE_NOHOOK)
+					continue;
+
+				const int FrontIndex = pFront && Index < FrontTileCount ? pFront[Index].m_Index : TILE_AIR;
+				bool Hookthrough = FrontIndex == TILE_THROUGH_CUT || FrontIndex == TILE_THROUGH_ALL || FrontIndex == TILE_THROUGH_DIR;
+				// Old hookthrough uses a marker next to the wall, in either game or front.
+				for(const ivec2 Offset : {ivec2(-1, 0), ivec2(1, 0), ivec2(0, -1), ivec2(0, 1)})
+				{
+					if(Hookthrough)
+						break;
+					const int NeighborX = x + Offset.x;
+					const int NeighborY = y + Offset.y;
+					if(NeighborX < 0 || NeighborX >= Width || NeighborY < 0 || NeighborY >= Height)
+						continue;
+					const size_t Neighbor = (size_t)NeighborY * Width + NeighborX;
+					Hookthrough = m_pTiles[Neighbor].m_Index == TILE_THROUGH || (pFront && Neighbor < FrontTileCount && pFront[Neighbor].m_Index == TILE_THROUGH);
+				}
+				if(Hookthrough)
+				{
+					if(m_vHookthroughMask.empty())
+						m_vHookthroughMask.resize((size_t)Width * Height);
+					m_vHookthroughMask[Index] = 1;
+				}
+			}
+		}
+	}
 	UploadTileData(m_VisualTiles, 0, false, true);
+	if(!m_vHookthroughMask.empty())
+	{
+		UploadTileData(m_VisualHookthrough, 1, false);
+		// The first pass does not include hookthrough walls, so keep both passes visible.
+		m_LayerClip = CClipRegion(0.0f, 0.0f, Width * 32.0f, Height * 32.0f);
+	}
+}
+
+void CRenderLayerEntityGame::Render(const CRenderLayerParams &Params)
+{
+	if(m_HookthroughEnabled != (g_Config.m_RcHookthroughAlpha < 100))
+		RebuildTileData();
+	CRenderLayerTile::Render(Params);
+}
+
+void CRenderLayerEntityGame::Unload()
+{
+	CRenderLayerTile::Unload();
+	if(m_VisualHookthrough.has_value())
+	{
+		m_VisualHookthrough->Unload();
+		m_VisualHookthrough = std::nullopt;
+	}
+	m_vHookthroughMask.clear();
+	m_vHookthroughMask.shrink_to_fit();
+}
+
+void CRenderLayerEntityGame::GetTileData(unsigned char *pIndex, unsigned char *pFlags, int *pAngleRotate, unsigned int x, unsigned int y, int CurOverlay) const
+{
+	CRenderLayerTile::GetTileData(pIndex, pFlags, pAngleRotate, x, y, CurOverlay);
+	if(m_vHookthroughMask.empty())
+		return;
+	const bool Hookthrough = m_vHookthroughMask[(size_t)y * m_pLayerTilemap->m_Width + x] != 0;
+	if(Hookthrough != (CurOverlay == 1))
+		*pIndex = TILE_AIR;
 }
 
 void CRenderLayerEntityGame::RenderTileLayerWithTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params)
@@ -1503,12 +1583,19 @@ void CRenderLayerEntityGame::RenderTileLayerWithTileBuffer(const ColorRGBA &Colo
 	if(Params.m_RenderTileBorder)
 		RenderKillTileBorder(Color.Multiply(GetDeathBorderColor()));
 	RenderTileLayer(Color, Params);
+	if(m_VisualHookthrough.has_value() && g_Config.m_RcHookthroughAlpha > 0)
+	{
+		ColorRGBA HookthroughColor = Color;
+		HookthroughColor.a *= g_Config.m_RcHookthroughAlpha / 100.0f;
+		RenderTileLayer(HookthroughColor, Params, &m_VisualHookthrough.value());
+	}
 }
 
 void CRenderLayerEntityGame::RenderTileLayerNoTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params)
 {
+	const uint8_t *pTileMask = m_vHookthroughMask.empty() ? nullptr : m_vHookthroughMask.data();
 	Graphics()->BlendNone();
-	RenderMap()->RenderTilemap(m_pTiles, m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f, Color, (Params.m_RenderTileBorder ? TILERENDERFLAG_EXTEND : 0) | LAYERRENDERFLAG_OPAQUE);
+	RenderMap()->RenderTilemap(m_pTiles, m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f, Color, (Params.m_RenderTileBorder ? TILERENDERFLAG_EXTEND : 0) | LAYERRENDERFLAG_OPAQUE, pTileMask);
 	Graphics()->BlendNormal();
 
 	if(Params.m_RenderTileBorder)
@@ -1518,7 +1605,13 @@ void CRenderLayerEntityGame::RenderTileLayerNoTileBuffer(const ColorRGBA &Color,
 			32.0f, Color.Multiply(GetDeathBorderColor()), TILERENDERFLAG_EXTEND | LAYERRENDERFLAG_TRANSPARENT);
 	}
 
-	RenderMap()->RenderTilemap(m_pTiles, m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f, Color, (Params.m_RenderTileBorder ? TILERENDERFLAG_EXTEND : 0) | LAYERRENDERFLAG_TRANSPARENT);
+	RenderMap()->RenderTilemap(m_pTiles, m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f, Color, (Params.m_RenderTileBorder ? TILERENDERFLAG_EXTEND : 0) | LAYERRENDERFLAG_TRANSPARENT, pTileMask);
+	if(pTileMask && g_Config.m_RcHookthroughAlpha > 0)
+	{
+		ColorRGBA HookthroughColor = Color;
+		HookthroughColor.a *= g_Config.m_RcHookthroughAlpha / 100.0f;
+		RenderMap()->RenderTilemap(m_pTiles, m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f, HookthroughColor, (Params.m_RenderTileBorder ? TILERENDERFLAG_EXTEND : 0) | LAYERRENDERFLAG_TRANSPARENT, pTileMask, true);
+	}
 }
 
 ColorRGBA CRenderLayerEntityGame::GetDeathBorderColor() const

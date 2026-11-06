@@ -85,7 +85,8 @@ void CMapRenderer::Load(ERenderType Type, CLayers *pLayers, IMapImages *pMapImag
 						GroupId,
 						LayerId,
 						pLayer->m_Flags,
-						pTileLayer);
+						pTileLayer,
+						pLayers->FrontLayer());
 					break;
 				case LAYER_FRONT:
 					pRenderLayer = std::make_unique<CRenderLayerEntityFront>(
