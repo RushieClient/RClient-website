@@ -8,7 +8,9 @@
 #include <game/client/gameclient.h>
 #include <game/localization.h>
 
-#if defined(CONF_PLATFORM_ANDROID)
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+#include <emscripten/emscripten.h>
+#elif defined(CONF_PLATFORM_ANDROID)
 #include <android/android_main.h>
 #else
 #include <base/process.h>
@@ -23,7 +25,15 @@ bool CLocalServer::RunServer(const std::vector<const char *> &vpArguments)
 	std::vector<const char *> vpArgumentsWithAuth = vpArguments;
 	vpArgumentsWithAuth.push_back(aAuthCommand);
 
-#if defined(CONF_PLATFORM_ANDROID)
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	EM_ASM({
+		const args = [];
+		for(let i = 0; i < $1; ++i)
+			args.push(UTF8ToString(HEAPU32[($0 >> 2) + i]));
+		Module['localServer'].start(args);
+	}, vpArgumentsWithAuth.data(), vpArgumentsWithAuth.size());
+	return true;
+#elif defined(CONF_PLATFORM_ANDROID)
 	if(StartAndroidServer(vpArgumentsWithAuth.data(), vpArgumentsWithAuth.size()))
 	{
 		GameClient()->m_Menus.ForceRefreshLanPage();
@@ -72,7 +82,9 @@ bool CLocalServer::RunServer(const std::vector<const char *> &vpArguments)
 
 void CLocalServer::KillServer()
 {
-#if defined(CONF_PLATFORM_ANDROID)
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	EM_ASM({ Module['localServer'].stop(); });
+#elif defined(CONF_PLATFORM_ANDROID)
 	ExecuteAndroidServerCommand("shutdown");
 	GameClient()->m_Menus.ForceRefreshLanPage();
 #else
@@ -87,7 +99,9 @@ void CLocalServer::KillServer()
 
 bool CLocalServer::IsServerRunning()
 {
-#if defined(CONF_PLATFORM_ANDROID)
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	return EM_ASM_INT({ return Module['localServer'].state === 2; });
+#elif defined(CONF_PLATFORM_ANDROID)
 	return IsAndroidServerRunning();
 #else
 	if(m_Process != INVALID_PROCESS && !process_is_alive(m_Process))
@@ -97,6 +111,17 @@ bool CLocalServer::IsServerRunning()
 	return m_Process != INVALID_PROCESS;
 #endif
 }
+
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+const char *CLocalServer::ErrorString() const
+{
+	static char s_aError[256];
+	EM_ASM({
+		stringToUTF8(Module['localServer'].error, $0, $1);
+	}, s_aError, sizeof(s_aError));
+	return s_aError;
+}
+#endif
 
 void CLocalServer::RconAuthIfPossible()
 {

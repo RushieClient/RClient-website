@@ -153,6 +153,7 @@ protected:
 	{
 	public:
 		bool m_Queued = false;
+		bool m_LocalOnly = false;
 		enum class EStatus
 		{
 			REFRESHING,
@@ -857,7 +858,7 @@ public:
 	void ForceRefreshLanPage();
 	void SetShowStart(bool ShowStart);
 	void ShowQuitPopup();
-	void JoinTutorial();
+	void JoinTutorial(bool LocalOnly = false);
 
 	//RClient
 	int DoMenuSettingsBar(CUIRect *pRect, const char *const *apTabNames, int TabCount, CButtonContainer *apPageTabs, int &CurTab, float TabHeight);

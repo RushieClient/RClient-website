@@ -80,14 +80,17 @@
 -	Create a new directory to build the client in.
 -	Then run `emcmake cmake .. -G "Unix Makefiles" -DVIDEORECORDER=OFF -DVULKAN=OFF -DSERVER=OFF -DTOOLS=OFF -DPREFER_BUNDLED_LIBS=ON` in your build directory to configure followed by `cmake --build . -j8` to build.
 -	For testing it is highly recommended to build in debug mode by also passing the argument `-DCMAKE_BUILD_TYPE=Debug` when invoking `emcmake cmake`, as this speeds up the build process and adds debug information as well as additional checks.
+-	The web client also builds an embedded Tutorial server, including when `-DSERVER=OFF` is passed. Build both modules with `cmake --build . --target game-client -j1`. On WSL, enable sufficient RAM and swap for linking the WebAssembly modules.
 -	Note that using the Ninja build system with Emscripten is not currently possible due to [CMake issue 16395](https://gitlab.kitware.com/cmake/cmake/-/issues/16395).
 
 ### Running the client via Emscripten
 
 -	To test the compiled code locally, run `emrun --browser firefox index.html` in the build directory.
 -	To host the compiled Emscripten client, copy the `DDNet.data`, `DDNet.js`, `DDNet.wasm` and `index.html` files from the build directory to the web server.
+	Also copy `DDNet-Server.js`, `DDNet-Server.wasm`, `DDNet-Server.data`, `local_server.js`, `local_server_worker.js` and any generated `*.worker.js` files alongside the client.
 	The file `index.html` in the build folder is copied from `other/emscripten/index.html`.
 -	You can also run `other/emscripten/server.py` to host a minimal server for testing using Python without needing to install Emscripten.
+	From the build directory, run `python3 ../other/emscripten/server.py 8000` and open `http://localhost:8000`. Start the client, then choose **Test Client** to play the bundled Tutorial locally. The normal dummy connection also works. Each new Test Client session resets the server; records are not persisted after the server stops. No separate DDNet server or external network connection is needed for gameplay.
 -	When using a proper web server, enable cross-origin policies to allow the client to download its components.
 	For example for apache2 on Debian-based distributions:
 	```sh
@@ -109,5 +112,12 @@
 	```
 
 ### Common problems and solutions
+
+-	To check the local server loader from the source directory, run `node --test other/emscripten/test_local_server.mjs`.
+-	To test the WebAssembly transport (after activating emsdk), run:
+	```sh
+	em++ -std=c++20 -O1 -pthread -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=3 -sEXIT_RUNTIME=1 -sEXPORTED_RUNTIME_METHODS=ccall -Isrc other/emscripten/test_local_network.cpp src/base/net_emscripten.cpp src/base/mem.cpp -o build-emscripten/test_local_network.js
+	node build-emscripten/test_local_network.js
+	```
 
 -	Make sure that the `CC` and `CXX` variables are not set in your shell environment, because this will interfere with the compiler selection of the emsdk.

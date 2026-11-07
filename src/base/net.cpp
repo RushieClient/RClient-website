@@ -6,6 +6,7 @@
 #include "dbg.h"
 #include "log.h"
 #include "mem.h"
+#include "net_emscripten.h"
 #include "str.h"
 #include "windows.h"
 
@@ -118,6 +119,9 @@ struct NETSOCKET_INTERNAL
 	bool broken;
 
 	NETSOCKET_BUFFER buffer;
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	CWebNetSocket *m_pWebSocket = nullptr;
+#endif
 };
 static NETSOCKET_INTERNAL invalid_socket = {NETTYPE_INVALID, -1, -1, -1, -1, false};
 
@@ -590,6 +594,12 @@ static int net_host_lookup_impl(const char *hostname, NETADDR *addr, int types)
 
 	log_trace("host_lookup", "host='%s' port='%d' types='%d'", host, port, types);
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	// Emscripten's DNS assigns synthetic addresses even to localhost.
+	if(str_comp_nocase(host, "localhost") == 0)
+		return net_host_lookup_fallback(host, addr, types, port);
+#endif
+
 	struct addrinfo hints;
 	mem_zero(&hints, sizeof(hints));
 
@@ -735,6 +745,10 @@ int net_would_block()
 
 int net_socket_read_wait(NETSOCKET sock, std::chrono::nanoseconds nanoseconds)
 {
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	if(sock->m_pWebSocket)
+		return web_net_wait(sock->m_pWebSocket, nanoseconds);
+#endif
 	const int64_t microseconds = std::chrono::duration_cast<std::chrono::microseconds>(nanoseconds).count();
 	dbg_assert(microseconds >= 0, "Negative wait duration %" PRId64 " not allowed", microseconds);
 
@@ -912,6 +926,18 @@ static int priv_net_create_socket(int domain, int type, const NETADDR *bindaddr)
 
 NETSOCKET net_udp_create(NETADDR bindaddr)
 {
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	NETSOCKET pSocket = (NETSOCKET_INTERNAL *)malloc(sizeof(*pSocket));
+	*pSocket = invalid_socket;
+	pSocket->m_pWebSocket = web_net_create(bindaddr.port);
+	if(!pSocket->m_pWebSocket)
+	{
+		free(pSocket);
+		return nullptr;
+	}
+	pSocket->type = NETTYPE_IPV4;
+	return pSocket;
+#endif
 	NETSOCKET sock = (NETSOCKET_INTERNAL *)malloc(sizeof(*sock));
 	*sock = invalid_socket;
 
@@ -1036,6 +1062,18 @@ static void priv_net_udp_send_failed(NETSOCKET sock, const NETADDR *addr)
 
 int net_udp_send(NETSOCKET sock, const NETADDR *addr, const void *data, int size)
 {
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	if(sock->m_pWebSocket)
+	{
+		const int Sent = web_net_send(sock->m_pWebSocket, addr, data, size);
+		if(Sent > 0)
+		{
+			network_stats.sent_bytes += Sent;
+			network_stats.sent_packets++;
+		}
+		return Sent;
+	}
+#endif
 	int d = -1;
 
 	if(addr->type & NETTYPE_IPV4)
@@ -1147,6 +1185,18 @@ int net_udp_send(NETSOCKET sock, const NETADDR *addr, const void *data, int size
 
 int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 {
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	if(sock->m_pWebSocket)
+	{
+		const int Received = web_net_recv(sock->m_pWebSocket, addr, data);
+		if(Received > 0)
+		{
+			network_stats.recv_bytes += Received;
+			network_stats.recv_packets++;
+		}
+		return Received;
+	}
+#endif
 	static const auto &&update_stats = [](int bytes) {
 		network_stats.recv_bytes += bytes;
 		network_stats.recv_packets++;
@@ -1263,6 +1313,14 @@ bool net_udp_is_broken(NETSOCKET sock)
 
 void net_udp_close(NETSOCKET sock)
 {
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	if(sock->m_pWebSocket)
+	{
+		web_net_close(sock->m_pWebSocket);
+		free(sock);
+		return;
+	}
+#endif
 	priv_net_close_all_sockets(sock);
 }
 

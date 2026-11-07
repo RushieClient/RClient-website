@@ -208,6 +208,8 @@
 					}
 				},
 				onExit: function() {
+					Module['localServer'].closed = true;
+					Module['localServer'].stop();
 					FS.syncfs(error => {
 						if (error) {
 							appendOutput(`Failed to synchronize filesystem with IndexedDB: ${error}`, true, "red");
@@ -463,6 +465,7 @@
 				}
 			});
 		</script>
+		<script src="local_server.js"></script>
 		<script async src="DDNet.js"></script>
 	</body>
 </html> 

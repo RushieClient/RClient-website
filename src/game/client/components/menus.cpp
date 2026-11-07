@@ -1063,7 +1063,7 @@ void CMenus::Render()
 	}
 	if(m_JoinTutorial.m_Queued && m_Popup == POPUP_NONE)
 	{
-		const char *pAddr = ServerBrowser()->GetTutorialServer();
+		const char *pAddr = m_JoinTutorial.m_LocalOnly ? nullptr : ServerBrowser()->GetTutorialServer();
 		if(pAddr)
 		{
 			Client()->Connect(pAddr);
@@ -1870,7 +1870,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			pStatusLabel = Localize("Could not get server list from master server");
 			break;
 		case CJoinTutorial::EStatus::NO_TUTORIAL_AVAILABLE:
-			pStatusLabel = Localize("There are no Tutorial servers available");
+			pStatusLabel = m_JoinTutorial.m_LocalOnly ? Localize("Starting local Tutorial server") : Localize("There are no Tutorial servers available");
 			break;
 		}
 		if(pStatusLabel != nullptr)
@@ -1922,13 +1922,23 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		}
 
 		const auto &&ShowFinalErrorMessage = [&]() {
+			if(m_JoinTutorial.m_LocalOnly)
+			{
+				const char *pError = "";
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+				pError = GameClient()->m_LocalServer.ErrorString();
+#endif
+				PopupMessage(Localize("Error joining Tutorial server"), pError[0] ? pError : Localize("Local Tutorial server could not be started."), Localize("Ok"));
+				GameClient()->m_LocalServer.KillServer();
+				return;
+			}
 			PopupMessage(Localize("Error joining Tutorial server"), Localize("Could not find a Tutorial server. Check your internet connection."), Localize("Ok"));
 		};
 		const auto &&RunServer = [&]() {
 			char aMotd[256];
 			str_copy(aMotd, "sv_motd \"");
 			char *pDst = aMotd + str_length(aMotd);
-			str_escape(&pDst, Localize("You're playing on a local server because no online Tutorial server could be found.\n\nYour record will only be saved locally."), aMotd + sizeof(aMotd) - 1);
+			str_escape(&pDst, m_JoinTutorial.m_LocalOnly ? Localize("You're playing Tutorial locally in your browser. Records are not saved after closing the page.") : Localize("You're playing on a local server because no online Tutorial server could be found.\n\nYour record will only be saved locally."), aMotd + sizeof(aMotd) - 1);
 			str_append(aMotd, "\"");
 			if(GameClient()->m_LocalServer.RunServer({"sv_register 0", "sv_map Tutorial", aMotd}))
 			{
@@ -1942,7 +1952,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		};
 		if(m_JoinTutorial.m_LocalServerState == CJoinTutorial::ELocalServerState::TRY)
 		{
-			if(LastStateChangeSeconds >= RefreshDelay)
+			if(m_JoinTutorial.m_LocalOnly || LastStateChangeSeconds >= RefreshDelay)
 			{
 				if(GameClient()->m_LocalServer.IsServerRunning())
 				{
@@ -1979,13 +1989,17 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		}
 		else if(m_JoinTutorial.m_LocalServerState == CJoinTutorial::ELocalServerState::WAITING_START)
 		{
-			if(LastStateChangeSeconds >= 5.0f)
+			bool Failed = false;
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+			Failed = GameClient()->m_LocalServer.ErrorString()[0] != '\0';
+#endif
+			if(Failed || LastStateChangeSeconds >= (m_JoinTutorial.m_LocalOnly ? 60.0f : 5.0f))
 			{
 				ShowFinalErrorMessage();
 			}
 			else
 			{
-				if(LastStateChangeSeconds >= 2.0f &&
+				if((m_JoinTutorial.m_LocalOnly || LastStateChangeSeconds >= 2.0f) &&
 					GameClient()->m_LocalServer.IsServerRunning())
 				{
 					Client()->Connect("localhost");
@@ -2007,6 +2021,8 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE) ||
 			Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER))
 		{
+			if(m_JoinTutorial.m_LocalOnly)
+				GameClient()->m_LocalServer.KillServer();
 			m_Popup = POPUP_NONE;
 		}
 	}
@@ -2719,14 +2735,20 @@ void CMenus::ShowQuitPopup()
 	m_Popup = POPUP_QUIT;
 }
 
-void CMenus::JoinTutorial()
+void CMenus::JoinTutorial(bool LocalOnly)
 {
 	m_JoinTutorial.m_Queued = true;
-	m_JoinTutorial.m_Status = CJoinTutorial::EStatus::REFRESHING;
+	m_JoinTutorial.m_LocalOnly = LocalOnly;
+	m_JoinTutorial.m_Status = LocalOnly ? CJoinTutorial::EStatus::NO_TUTORIAL_AVAILABLE : CJoinTutorial::EStatus::REFRESHING;
 	m_JoinTutorial.m_TryRefresh = false;
-	m_JoinTutorial.m_TriedRefresh = false;
-	m_JoinTutorial.m_LocalServerState = CJoinTutorial::ELocalServerState::NOT_TRIED;
+	m_JoinTutorial.m_TriedRefresh = LocalOnly;
+	m_JoinTutorial.m_LocalServerState = LocalOnly ? CJoinTutorial::ELocalServerState::TRY : CJoinTutorial::ELocalServerState::NOT_TRIED;
 	m_JoinTutorial.m_StateChange = time_get_nanoseconds();
+	if(LocalOnly)
+	{
+		SetShowStart(false);
+		GameClient()->m_LocalServer.KillServer();
+	}
 }
 
 //RClient

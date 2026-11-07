@@ -191,6 +191,10 @@ endif()
 
 if(TARGET_OS STREQUAL "emscripten")
   include(${PROJECT_SOURCE_DIR}/cmake/toolchains/Emscripten.toolchain)
+  # The web client ships its own isolated local server, even with -DSERVER=OFF.
+  if(CLIENT)
+    set(SERVER ON)
+  endif()
 endif()
 
 if(TEST_MYSQL)
@@ -2234,6 +2238,8 @@ set(COPY_FILES
 if(TARGET_OS STREQUAL "emscripten")
   list(APPEND COPY_FILES other/emscripten/background.png)
   list(APPEND COPY_FILES other/emscripten/index.html)
+  list(APPEND COPY_FILES other/emscripten/local_server.js)
+  list(APPEND COPY_FILES other/emscripten/local_server_worker.js)
   list(APPEND COPY_FILES other/icons/DDNet.ico)
 endif()
 file(COPY ${COPY_FILES} DESTINATION .)
@@ -2404,6 +2410,8 @@ set_src(BASE GLOB_RECURSE src/base
   mem.h
   net.cpp
   net.h
+  net_emscripten.cpp
+  net_emscripten.h
   os.cpp
   os.h
   process.cpp
@@ -3514,6 +3522,19 @@ if(SERVER)
       PROPERTY OUTPUT_NAME ${SERVER_EXECUTABLE}
   )
   target_link_libraries(game-server ${LIBS_SERVER})
+  if(TARGET_OS STREQUAL "emscripten")
+    set_target_properties(game-server PROPERTIES OUTPUT_NAME "DDNet-Server" SUFFIX ".js")
+    target_link_options(game-server PRIVATE
+      "SHELL:-s PROXY_TO_PTHREAD=1"
+      "SHELL:-s PTHREAD_POOL_SIZE=12"
+      "SHELL:-s EXPORTED_FUNCTIONS=_main,_EmscriptenLocalPacket,_EmscriptenLocalReset"
+      "SHELL:--preload-file '${PROJECT_SOURCE_DIR}/data/maps/Tutorial.map@data/maps/Tutorial.map'"
+      "SHELL:--preload-file '${PROJECT_SOURCE_DIR}/data/wordlist.txt@data/wordlist.txt'"
+    )
+    if(CLIENT)
+      add_dependencies(game-client game-server)
+    endif()
+  endif()
   list(APPEND TARGETS_OWN game-server)
   list(APPEND TARGETS_LINK game-server)
 
@@ -4282,10 +4303,13 @@ foreach(ext zip tar.gz tar.xz)
   endforeach()
   foreach(target ${CPACK_TARGETS})
     if(TARGET_OS STREQUAL "emscripten")
+      if(NOT target STREQUAL "game-client" AND NOT target STREQUAL "game-server")
+        continue()
+      endif()
       # The main target with Emscripten is the .html file, but we instead want the .data, .js and .wasm files and use our own index.html
-      list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/$<TARGET_FILE_BASE_NAME:game-client>.data ${TMPDIR}/)
-      list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/$<TARGET_FILE_BASE_NAME:game-client>.js ${TMPDIR}/)
-      list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/$<TARGET_FILE_BASE_NAME:game-client>.wasm ${TMPDIR}/)
+      list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/$<TARGET_FILE_BASE_NAME:${target}>.data ${TMPDIR}/)
+      list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/$<TARGET_FILE_BASE_NAME:${target}>.js ${TMPDIR}/)
+      list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/$<TARGET_FILE_BASE_NAME:${target}>.wasm ${TMPDIR}/)
     else()
       list(APPEND COPY_TARGET_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}> ${TMPDIR}/)
     endif()
@@ -4401,8 +4425,11 @@ foreach(target ${TARGETS})
     set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE TRUE)
   endif()
   if(TARGET_OS STREQUAL "emscripten")
-    # Preload data directory into the filesystem
-    target_link_options(${target} PRIVATE --preload-file data)
+    if(target STREQUAL "game-client")
+      # Only the client needs graphics and the complete asset bundle.
+      set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS " ${WASM_CLIENT_LINKER_FLAGS}")
+      target_link_options(${target} PRIVATE --preload-file data)
+    endif()
   endif()
 endforeach()
 

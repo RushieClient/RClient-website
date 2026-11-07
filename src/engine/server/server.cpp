@@ -7,6 +7,10 @@
 #include "databases/connection_pool.h"
 #include "register.h"
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+#include <emscripten/emscripten.h>
+#endif
+
 #include <base/bytes.h>
 #include <base/fs.h>
 #include <base/io.h>
@@ -3429,6 +3433,11 @@ int CServer::Run()
 		log_info("server", "| rcon password: '%s' |", Config()->m_SvRconPassword);
 		log_info("server", "+-------------------------+");
 	}
+
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	if(m_RunServer < STOPPING)
+		MAIN_THREAD_EM_ASM({ self.postMessage({type: 'ready'}); });
+#endif
 
 	// start game
 	{
