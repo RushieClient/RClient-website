@@ -21,6 +21,10 @@
 #include <android/android_main.h>
 #endif
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+#include <emscripten/emscripten.h>
+#endif
+
 void CMenusStart::RenderStartMenu(CUIRect MainView)
 {
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_START);
@@ -99,7 +103,21 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		}
 	}
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	Menu.HSplitBottom(55.0f, &Menu, nullptr);
+	Menu.HSplitBottom(40.0f, &Menu, &Button);
+	static CButtonContainer s_DownloadClientButton;
+	if(GameClient()->m_Menus.DoButton_Menu(&s_DownloadClientButton, Localize("Download"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, ColorRGBA(0.0f, 0.4f, 0.55f, 0.4f)))
+	{
+		EM_ASM({
+			if(Module['openDownloads'])
+				Module['openDownloads']();
+		});
+	}
+	Menu.HSplitBottom(5.0f, &Menu, nullptr); // little space
+#else
 	Menu.HSplitBottom(100.0f, &Menu, nullptr);
+#endif
 	Menu.HSplitBottom(40.0f, &Menu, &Button);
 	static CButtonContainer s_SettingsButton;
 	if(GameClient()->m_Menus.DoButton_Menu(&s_SettingsButton, Localize("Settings"), 0, &Button, BUTTONFLAG_LEFT, g_Config.m_ClShowStartMenuImages ? "settings" : nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || CheckHotKey(KEY_S))
@@ -142,7 +160,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Menu.HSplitBottom(5.0f, &Menu, nullptr); // little space
 	Menu.HSplitBottom(40.0f, &Menu, &Button);
 	static CButtonContainer s_PlayButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_PlayButton, Localize("Test Client", "Start menu"), 0, &Button, BUTTONFLAG_LEFT, g_Config.m_ClShowStartMenuImages ? "play_game" : nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) || CheckHotKey(KEY_P))
+	if(GameClient()->m_Menus.DoButton_Menu(&s_PlayButton, Localize("Test Client", "Start menu"), 0, &Button, BUTTONFLAG_LEFT, g_Config.m_ClShowStartMenuImages ? "play_game" : nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, ColorRGBA(0.08f, 0.38f, 0.16f, 0.35f)) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) || CheckHotKey(KEY_P))
 	{
 #if defined(CONF_PLATFORM_EMSCRIPTEN)
 		GameClient()->m_Menus.JoinTutorial(true);

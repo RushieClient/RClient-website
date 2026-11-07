@@ -484,7 +484,9 @@ void CGameClient::OnInit()
 
 	// Aggressively try to grab window again since some Windows users report
 	// window not being focused after starting client.
+#if !defined(CONF_PLATFORM_EMSCRIPTEN)
 	Graphics()->SetWindowGrab(true);
+#endif
 
 	CChecksumData *pChecksum = Client()->ChecksumData();
 	pChecksum->m_SizeofGameClient = sizeof(*this);

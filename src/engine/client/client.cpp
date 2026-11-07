@@ -3411,6 +3411,10 @@ void CClient::Run()
 	int64_t NextUpdateTime = time_get();
 	int64_t NextRenderTime = time_get();
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	bool FirstFrame = true;
+#endif
+
 	while(true)
 	{
 		set_new_tick();
@@ -3568,6 +3572,17 @@ void CClient::Run()
 
 				Render();
 				m_pGraphics->Swap();
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+				if(FirstFrame)
+				{
+					FirstFrame = false;
+					EM_ASM({
+						if(Module['onClientReady'])
+							Module['onClientReady']();
+					});
+					Input()->MouseModeRelative();
+				}
+#endif
 			}
 
 			// Wake up for the next update or frame, whichever comes first. While playing, also wake up for

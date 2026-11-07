@@ -102,7 +102,9 @@ void CInput::Init()
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
 	m_pConfigManager = Kernel()->RequestInterface<IConfigManager>();
 
+#if !defined(CONF_PLATFORM_EMSCRIPTEN)
 	MouseModeRelative();
+#endif
 
 	InitJoysticks();
 }

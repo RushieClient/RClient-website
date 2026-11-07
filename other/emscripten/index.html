@@ -1,157 +1,456 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<meta name="description" content="The DDNet client running in a web browser.">
-		<title>DDNet Web</title>
+		<meta name="description" content="Try RClient (RushieClient) in your browser or download the custom DDNet client for Windows, Linux, macOS and Android. Choose RClient or RClient Extra.">
+		<title>RClient — Download the DDNet Client &amp; Try in Browser</title>
+		<meta property="og:type" content="website">
+		<meta property="og:site_name" content="RClient">
+		<meta property="og:title" content="RClient — DDNet Client &amp; Browser Demo">
+		<meta property="og:description" content="Download RClient for Windows, Linux, macOS and Android, explore RClient Extra, or try the DDNet Tutorial in your browser.">
+		<meta name="twitter:card" content="summary">
+		<meta name="twitter:title" content="RClient — DDNet Client &amp; Browser Demo">
+		<meta name="twitter:description" content="Download RClient for Windows, Linux, macOS and Android, explore RClient Extra, or try the DDNet Tutorial in your browser.">
 		<link rel="icon" type="image/x-icon" href="DDNet.ico">
 		<style>
-		body {
-			background: url('background.png') #ccc;
-			background-size: cover;
-			background-position: center center;
-			font-family: 'Arial', 'Helvetica', sans-serif;
+		@font-face {
+			font-family: 'Inter';
+			src: url('Inter_24pt-Regular.ttf') format('truetype');
+			font-style: normal;
+			font-weight: 400;
+			font-display: swap;
 		}
-		body, html, #canvas {
+		@font-face {
+			font-family: 'Inter';
+			src: url('Inter_24pt-SemiBold.ttf') format('truetype');
+			font-style: normal;
+			font-weight: 600;
+			font-display: swap;
+		}
+		:root {
+			color-scheme: dark;
+			font-family: 'Inter', Arial, sans-serif;
+			color: #eef9ff;
+		}
+		* {
+			box-sizing: border-box;
+		}
+		[hidden] {
+			display: none !important;
+		}
+		html, body {
 			width: 100%;
 			height: 100%;
 			margin: 0;
 		}
-		h1, h2 {
-			margin: 5px 0 15px 0;
-			color: #ffa500;
+		body {
+			background: radial-gradient(ellipse at center, #000000 0%, #00151d 55%, #003140 100%);
+		}
+		button, a {
+			-webkit-tap-highlight-color: transparent;
 		}
 		button {
-			height: 30px;
-			padding: 0 20px;
-			border: none;
-			border-radius: 6px;
-			background-color: #ffa500;
-			transition: background-color 0.3s linear;
-			color: #fff;
-			font-weight: bold;
+			font: inherit;
+			color: inherit;
 			cursor: pointer;
 		}
-		button:hover {
-			background-color: #f27400;
+		a {
+			color: inherit;
 		}
-		button[disabled] {
-			background-color: #965518;
-			cursor: not-allowed;
-		}
-		#controls, #output {
-			padding: 15px;
-			border-radius: 15px;
-			box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-			background-color: rgba(255, 255, 255, 0.85);
+		button:focus-visible, a:focus-visible {
+			outline: 2px solid #1ce3ff;
+			outline-offset: 6px;
 		}
 		#controls {
-			position: sticky;
-			width: 850px;
-			height: fit-content;
-			box-sizing: border-box;
-			margin: 0 auto;
-			transform: translate(0, 10vh);
+			background: inherit;
+			position: fixed; inset: 0; z-index: 2; display: grid; place-items: center;
+			padding: 40px 24px; overflow: auto; cursor: pointer; transition: opacity 300ms;
 		}
-		#controls h1 {
+		#controls.leaving {
+			opacity: 0;
+			pointer-events: none;
+		}
+		.splash-main {
+			width: 100%;
+			height: 100%;
 			text-align: center;
 		}
-		#drop-target {
-			width: 500px;
-			margin: 15px auto;
-			padding: 0 15px;
-			border: 2px dashed #ffa500;
-			border-radius: 6px;
-			background: #ffa50020;
-			cursor: pointer;
+		.brand {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			display: block;
+			width: 96px;
+			height: auto;
 		}
-		#drop-target-status {
-			font-style: italic;
-			text-align: center;
-		}
-		#drop-target:hover, #drop-target[drop-active=true] {
-			background: #ffa50035;
+		.actions {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			animation: appear 500ms 700ms both;
 		}
 		#launch-button {
+			position: absolute;
+			top: calc(50% + 94px);
+			left: 50%;
+			transform: translateX(-50%);
+			white-space: nowrap;
+			pointer-events: auto;
+			padding: 8px 16px;
+			border: 0;
+			background: none;
+			font-size: clamp(20px, 3vw, 26px);
+			font-weight: 400;
+			color: #c9e3ed80;
+			filter: blur(0.75px);
+			transition: color 180ms;
+			animation: hint-pulse 5s ease-in-out infinite;
+		}
+		#launch-button:hover, #launch-button:focus-visible {
+			color: #c9e3edbb;
+		}
+		#download-button {
+			position: absolute;
+			bottom: max(32px, env(safe-area-inset-bottom));
+			left: 50%;
+			transform: translateX(-50%);
+			pointer-events: auto;
+			min-width: 156px;
+			height: 40px;
+			padding: 0 28px;
+			border: 1px solid #ffffff0d;
+			border-radius: 12px;
+			background: #000000;
+			color: #9aa7ad;
+			font-size: 13px;
+			font-weight: 600;
+			letter-spacing: 0.02em;
+			box-shadow: 0 6px 18px #00000033;
+			transition: color 180ms, border-color 180ms, background-color 180ms;
+		}
+		#download-button:hover {
+			color: #d4e0e5;
+			border-color: #ffffff24;
+			background: #040607;
+		}
+		#back-button:hover {
+			color: #1ce3ff;
+		}
+		.waiting .actions {
+			display: none;
+		}
+		#controls.waiting, #controls.downloads-open, #controls.error {
+			cursor: default;
+		}
+		#downloads {
+			width: min(570px, calc(100% - 32px));
+			max-height: calc(100% - 48px);
+			padding: 24px;
+			margin: auto;
+			overflow: auto;
+			color: inherit;
+			text-align: center;
+			border: 1px solid #ffffff12;
+			border-radius: 14px;
+			background: #00000052;
+			box-shadow: 0 20px 70px #00000033;
+			backdrop-filter: blur(24px);
+			-webkit-backdrop-filter: blur(24px);
+		}
+		#downloads::backdrop {
+			background: #00000022;
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+		}
+		.download-header {
 			position: relative;
-			display: block;
-			width: 250px;
-			margin: 0 auto;
-			z-index: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 16px;
+			padding: 0 32px;
+			margin-bottom: 24px;
+		}
+		.download-header h2 {
+			margin: 0;
+			font-size: 17px;
+			font-weight: 400;
+			color: #ffffff;
+		}
+		.channels {
+			display: flex;
+			justify-content: center;
+			gap: 8px;
+			margin-bottom: 20px;
+		}
+		.channels button {
+			flex: 1;
+			min-width: 0;
+			padding: 12px 22px;
+			border: 1px solid transparent;
+			border-radius: 8px;
+			background: #ffffff09;
+			font-size: 14px;
+			color: #ffffffa6;
+			transition: border-color 180ms, background 180ms;
+		}
+		.channels button[aria-pressed="true"] {
+			background: #ffffff24;
+			color: #ffffff;
+		}
+		.download-content {
+			display: grid;
+		}
+		#download-cards {
+			grid-area: 1 / 1;
+			display: grid;
+			grid-template-columns: repeat(auto-fit, 120px);
+			justify-content: center;
+			align-content: start;
+			height: 120px;
+			overflow: auto;
+			gap: 12px;
+		}
+		.platform-card {
+			aspect-ratio: 1;
+			padding: 12px;
+			display: grid;
+			grid-template-rows: auto 1fr auto;
+			text-decoration: none;
+			text-align: left;
+			border: 1px solid transparent;
+			border-radius: 8px;
+			background: #00000040;
+			transition: border-color 180ms, background 180ms;
+		}
+		.platform-card:hover {
+			border-color: #ffffff16;
+			background: #ffffff17;
+		}
+		.platform-name {
+			font-size: 12px;
+		}
+		.platform-card svg {
+			width: 44px;
+			height: 44px;
+			margin: auto;
+			color: #ffffffc9;
+		}
+		.platform-size {
+			justify-self: end;
+			font-size: 10px;
+			color: #ffffff70;
+		}
+		#download-status, #launch-status {
+			color: #9bb7c3;
+			font-size: 14px;
+			line-height: 1.6;
+		}
+		#release-link {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			height: 32px;
+			margin-top: 18px;
+			font-size: 11px;
+			color: #ffffff70;
+			text-decoration: none;
+		}
+		#download-status {
+			grid-area: 1 / 1;
+			place-self: center;
+			margin: 0;
+			padding: 0 16px;
+			max-height: 120px;
+			overflow: auto;
+		}
+		#download-status:empty {
+			display: none;
+		}
+		#back-button {
+			position: absolute;
+			top: 50%;
+			right: 0;
+			transform: translateY(-50%);
+			padding: 0 6px;
+			border: 0;
+			background: none;
+			color: #ffffff80;
+			font-size: 24px;
+		}
+		.launch-message {
+			position: absolute;
+			top: calc(50% + 110px);
+			left: 50%;
+			transform: translateX(-50%);
+			width: min(90%, 650px);
+		}
+		#launch-status:empty {
+			display: none;
+		}
+		.waiting #launch-status {
+			margin: 0;
+			font-size: 11px;
+			color: #79919a;
+		}
+		.error .actions {
+			display: none;
+		}
+		.error #launch-status {
+			color: #ffc1b9;
+		}
+		#reload-button {
+			margin-top: 12px;
+			padding: 10px 18px;
+			border: 1px solid #49707e;
+			border-radius: 8px;
+			background: #021620;
+		}
+		#loading-bar {
+			position: absolute;
+			top: calc(50% + 94px);
+			left: 50%;
+			transform: translateX(-50%);
+			width: min(240px, 60vw);
+			height: 3px;
+			border-radius: 2px;
+			overflow: hidden;
+			background: #ffffff12;
 		}
 		#launch-button-progress {
-			position: absolute;
-			left: 0;
-			top: 0;
-			width: 0%;
 			height: 100%;
-			border-radius: 6px;
-			transition: width 0.3s linear;
-			background: #ffa500;
-			z-index: -1;
+			width: 0%;
+			background: #ffffff;
+			transition: width 200ms;
 		}
 		#canvas {
-			position: absolute;
-			top: 0px;
-			left: 0px;
+			position: fixed;
+			inset: 0;
+			width: 100%;
+			height: 100%;
 			border: 0;
-			overflow: hidden;
-			display: block;
 		}
 		#output {
-			position: sticky;
-			width: 90%;
-			height: 90%;
-			inset: 0px;
-			margin: 0 auto;
-			box-sizing: border-box;
-			transform: translate(0, 5vh);
-			display: flex;
-			flex-direction: column;
+			display: none;
 		}
-		#outputcontent {
-			overflow: hidden scroll;
-			flex: 1;
+		@keyframes appear {
+			from {
+				opacity: 0;
+				transform: translateY(8px);
+				visibility: hidden;
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+				visibility: visible;
+			}
 		}
-		#outputcontent .line {
-			border-left: 5px solid;
-			padding-left: 10px;
+		@keyframes hint-pulse {
+			0%, 100% { opacity: 0.65; }
+			50% { opacity: 0.85; }
+		}
+		@media (max-width: 597px) {
+			#download-cards {
+				height: 252px;
+			}
+		}
+		@media (max-width: 380px) {
+			#controls {
+				padding: 28px 16px;
+			}
+			#downloads {
+				padding: 20px 16px;
+			}
+			.platform-card {
+				padding: 12px;
+			}
+			.channels button {
+				padding: 12px 16px;
+			}
+		}
+		@media (prefers-reduced-motion: reduce) {
+			*, *::before, *::after {
+				animation: none !important;
+				transition: none !important;
+			}
 		}
 		</style>
 	</head>
 	<body>
 		<div id="controls">
-			<h1>DDNet Web</h1>
-			<p>This is an experimental version of the <a href="https://ddnet.org/downloads/">DDNet client</a> running in a web browser.</p>
-			<p>Connecting to most servers is currently not possible. Servers must be compiled with support for WebSockets.</p>
-			<div id="drop-target">
-				<p>You can drop a <code>.demo</code> file, <code>.map</code> file or a <code>ddnet://</code> link here, or click to select a file.
-				You can also drop files and links directly into the window after starting the client.</p>
-				<p id="drop-target-status">No file or link selected</p>
-				<input id="drop-target-file-input" type="file" accept=".demo,.map" hidden>
-			</div>
-			<button id="launch-button" disabled>
-				<span id="launch-button-progress"></span>
-				<span id="launch-button-label">Loading…</span>
-			</button>
-			<noscript><p><b>You need to allow JavaScript in your browser to use this website.</b></p></noscript>
+			<main class="splash-main">
+				<img class="brand" src="rclient-logo.svg" alt="RClient" width="96" height="111">
+				<div class="actions">
+					<button id="launch-button" type="button">Click to start</button>
+					<button id="download-button" type="button" aria-expanded="false" aria-controls="downloads">Download</button>
+				</div>
+
+				<div class="launch-message">
+					<p id="launch-status" role="status"></p>
+					<button id="reload-button" type="button" hidden>Reload page</button>
+				</div>
+				<noscript><p>Enable JavaScript in your browser to start RClient.</p></noscript>
+			</main>
+			<div id="loading-bar" role="progressbar" aria-label="Loading client" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="launch-button-progress"></div></div>
 		</div>
+		<dialog id="downloads" aria-labelledby="download-title" hidden>
+			<div class="download-header">
+				<h2 id="download-title">Download client</h2>
+				<button id="back-button" type="button" aria-label="Close downloads">×</button>
+			</div>
+			<div class="channels" role="group" aria-label="Download channel">
+				<button type="button" data-repository="RushieClient-ddnet" aria-pressed="true">RClient</button>
+				<button type="button" data-repository="RushieClient-ddnet-extra" aria-pressed="false">RClient Extra</button>
+			</div>
+			<div class="download-content">
+				<p id="download-status" role="status"></p>
+				<div id="download-cards"></div>
+			</div>
+			<a id="release-link" target="_blank" rel="noopener noreferrer">All releases on GitHub</a>
+		</dialog>
 		<div id="output" style="display: none">
 			<h2>Console log</h2>
 			<div id="outputcontent"></div>
 		</div>
-		<canvas id="canvas" style="display: none">Canvas not supported.</canvas>
+		<canvas id="canvas" tabindex="0" style="display: none">Canvas not supported.</canvas>
 		<script>
 			const homePath = "/home/web_user/.local/share/ddnet";
 			const output = document.getElementById('output');
 			const outputContent = document.getElementById('outputcontent');
 			const launchButton = document.getElementById('launch-button');
 			const launchButtonProgress = document.getElementById('launch-button-progress');
-			const launchButtonLabel = document.getElementById('launch-button-label');
-			const dropTarget = document.getElementById('drop-target');
-			const dropTargetStatus = document.getElementById('drop-target-status');
-			const dropTargetFileInput = document.getElementById('drop-target-file-input');
+			const controls = document.getElementById('controls');
+			const loadingBar = document.getElementById('loading-bar');
+			const launchStatus = document.getElementById('launch-status');
+			const reloadButton = document.getElementById('reload-button');
+			const downloadButton = document.getElementById('download-button');
+			const downloads = document.getElementById('downloads');
+			const downloadCards = document.getElementById('download-cards');
+			const downloadStatus = document.getElementById('download-status');
+			const releaseLink = document.getElementById('release-link');
+			const channelButtons = downloads.querySelectorAll('[data-repository]');
+			const releases = new Map();
+			let selectedChannel = 'RushieClient-ddnet';
+			let channelRequest = 0;
+			let runtimeReady = false;
+			let launchState = 'idle';
+
+			function showLaunchError(message) {
+				launchState = 'error';
+				controls.hidden = false;
+				controls.classList.remove('leaving', 'waiting', 'downloads-open');
+				controls.classList.add('error');
+				downloads.close();
+				downloads.hidden = true;
+				downloadButton.setAttribute('aria-expanded', 'false');
+				loadingBar.hidden = true;
+				Module['canvas'].style.display = 'none';
+				launchStatus.textContent = message;
+				reloadButton.hidden = false;
+			}
+			reloadButton.addEventListener('click', () => location.reload());
 			function appendOutput(message, bold, textColor, borderColor) {
 				const span = document.createElement("span");
 				span.textContent = message;
@@ -181,10 +480,12 @@
 			function sanitizeFilename(filename) {
 				return filename.replace(/[\/\\\?\|\*<>:"]/g, "_");
 			}
-			var loadOnLaunch = { file: null, path: null, link: null };
 			var Module = {
 				noInitialRun: true,
 				arguments: [],
+				openDownloads: function() {
+					downloadButton.click();
+				},
 				print: function(text) {
 					const parsedLine = parseAnsiColorRgb(text);
 					console.log(parsedLine.message);
@@ -195,27 +496,47 @@
 					appendOutput(text, false, "red");
 				},
 				onRuntimeInitialized: function() {
-					const oldTransition = launchButton.style.transition;
-					launchButton.style.transition = "none";
-					launchButton.disabled = false;
-					launchButtonLabel.textContent = "Start DDNet client";
-					launchButtonProgress.style.display = "none";
-					launchButton.offsetHeight; // Force reflow to avoid transition
-					launchButton.style.transition = oldTransition;
+					runtimeReady = true;
+					launchButtonProgress.style.width = '100%';
+					loadingBar.setAttribute('aria-valuenow', '100');
+					if (launchState === 'waiting') {
+						launchButton.click();
+					}
 					// For testing when compiled with emrun support, allow launching automatically by specifying URL parameter.
 					if (typeof emrun_register_handlers === "function" && document.location.hash === "#__emrun_autostart__") {
 						launchButton.click();
 					}
 				},
-				onExit: function() {
+				onAbort: function() {
+					showLaunchError('Could not load the client. Try reloading the page.');
+				},
+				onClientReady: function() {
+					if (launchState !== 'starting') {
+						return;
+					}
+					launchState = 'running';
+					launchButtonProgress.style.width = '100%';
+					loadingBar.setAttribute('aria-valuenow', '100');
+					controls.classList.add('leaving');
+					setTimeout(() => {
+						if (launchState === 'running') {
+							controls.hidden = true;
+						}
+					}, 300);
+				},
+				onClientLoading: function(caption, content, progress) {
+					if (launchState !== 'starting') {
+						return;
+					}
+					launchStatus.textContent = content || caption || 'Starting client…';
+					const percent = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+					launchButtonProgress.style.width = `${percent}%`;
+					loadingBar.setAttribute('aria-valuenow', percent);
+				},
+				onExit: function(code) {
+					const normalExit = code === 0 && launchState !== 'error';
 					Module['localServer'].closed = true;
 					Module['localServer'].stop();
-					FS.syncfs(error => {
-						if (error) {
-							appendOutput(`Failed to synchronize filesystem with IndexedDB: ${error}`, true, "red");
-							return;
-						}
-					});
 					// After client quits, hide the canvas and reset the cursor, as the canvas
 					// will be entirely black, also blocking the view of the console output.
 					Module['canvas'].style.display = "none";
@@ -224,25 +545,45 @@
 					// Also reset cursor of body because the cursor sometimes does not become
 					// visible until being moved.
 					document.body.style.cursor = "default";
-					appendOutput("Client closed. Reload the page to restart.", true);
-					const restartButton = document.createElement("button");
-					restartButton.textContent = "Reload page";
-					restartButton.style.marginTop = "10px";
-					restartButton.addEventListener('click', e => location.reload());
-					outputContent.appendChild(restartButton);
-					outputContent.scrollTop = outputContent.scrollHeight;
+					if (document.pointerLockElement) {
+						document.exitPointerLock();
+					}
+					if (normalExit) {
+						launchState = 'closed';
+						controls.hidden = false;
+						controls.classList.remove('leaving', 'waiting');
+						loadingBar.hidden = true;
+						launchStatus.textContent = '';
+					} else if (launchState !== 'error') {
+						showLaunchError('The client exited unexpectedly. Reload the page to start again.');
+					}
+					FS.syncfs(error => {
+						if (error) {
+							appendOutput(`Failed to synchronize filesystem with IndexedDB: ${error}`, true, "red");
+							showLaunchError('Could not save settings. Reload the page to restart.');
+							return;
+						}
+						if (normalExit && launchState === 'closed') {
+							if (typeof emrun_register_handlers === 'function' && document.location.hash === '#__emrun_autostart__') {
+								return;
+							}
+							location.reload();
+						}
+					});
 				},
 				totalDependencies: 0,
 				monitorRunDependencies(left) {
 					this.totalDependencies = Math.max(this.totalDependencies, left);
 					const value = this.totalDependencies - left;
-					launchButtonLabel.textContent = this.totalDependencies == 1 ? "Loading…" : `Loading… (${value}/${this.totalDependencies})`;
-					launchButtonProgress.style.width = `${value * 100.0 / this.totalDependencies}%`;
+					const progress = this.totalDependencies ? Math.round(value * 100 / this.totalDependencies) : 0;
+					launchButtonProgress.style.width = `${progress}%`;
+					loadingBar.setAttribute('aria-valuenow', progress);
 				},
 				canvas: document.getElementById('canvas')
 			};
 			window.onerror = function(message, url, line, column, error) {
 				appendOutput(message, true, "red");
+				showLaunchError('The client encountered an error. Try reloading the page.');
 				if (error && error.stack) {
 					for (const line of error.stack.split("\n")) {
 						if (line.length > 0) {
@@ -253,7 +594,7 @@
 				// Force stop audio processing because the client does not do so when force quit on
 				// assertion errors and segmentation faults. This would otherwise cause many error
 				// messages to be emitted when audio processing continues after the runtime exited.
-				var SDL2 = Module['SDL2'];
+				var SDL2 = Module['SDL2'] || {};
 				if (SDL2.audio !== undefined) {
 					if (SDL2.audio.scriptProcessorNode !== undefined) {
 						SDL2.audio.scriptProcessorNode.disconnect();
@@ -269,7 +610,7 @@
 				}
 				// Force quit the client on errors, because the runtime does not exit otherwise, which
 				// would cause tests using `emrun` to time out and prevent `onExit` from being invoked.
-				if (!ABORT) {
+				if (runtimeReady && typeof ABORT !== 'undefined' && !ABORT) {
 					Module.ccall('EmscriptenCallbackQuitForce', null, [], []);
 				}
 			};
@@ -282,43 +623,199 @@
 			Module['canvas'].addEventListener('contextmenu', e => e.preventDefault());
 			Module['canvas'].addEventListener('webglcontextcreationerror', e => {
 				appendOutput(`Failed to create WebGL context: ${e.statusMessage || "Unknown error"}`, true, "red");
+				showLaunchError('Could not create a WebGL context. Check WebGL support in your browser.');
 			});
 			Module['canvas'].addEventListener('webglcontextlost', e => {
 				// The client cannot currently recover from GL context loss, because it
 				// would require reloading all textures, framebuffers etc.
 				appendOutput(`The WebGL context was lost: ${e.statusMessage || "Unknown error"}`, true, "red");
+				showLaunchError('The graphics context was lost. Reload the page.');
 				Module.ccall('EmscriptenCallbackQuit', null, [], []);
 			});
 
-			// Launch button
-			launchButton.addEventListener('click', async e => {
-				document.getElementById('controls').style.display = "none";
-				output.style.display = "flex";
-				appendOutput("Synchronizing filesystem with IndexedDB…")
-				FS.mkdirTree(homePath);
-				FS.mount(IDBFS, {}, homePath);
-				FS.syncfs(true, async error => {
-					if (error) {
-						appendOutput(`Failed to synchronize filesystem with IndexedDB: ${error}`, true, "red");
+			// All launch paths use this handler; an early click waits for the runtime.
+			launchButton.addEventListener('click', () => {
+				if (!downloads.hidden || !['idle', 'waiting'].includes(launchState)) {
+					return;
+				}
+				launchState = 'waiting';
+				controls.classList.add('waiting');
+				loadingBar.hidden = false;
+				launchStatus.textContent = runtimeReady ? 'Preparing client…' : 'Loading client…';
+				if (!runtimeReady) {
+					return;
+				}
+				launchState = 'starting';
+				try {
+					FS.mkdirTree(homePath);
+					FS.mount(IDBFS, {}, homePath);
+					FS.syncfs(true, error => {
+						if (launchState !== 'starting') {
+							return;
+						}
+						if (error) {
+							appendOutput(`Failed to synchronize filesystem with IndexedDB: ${error}`, true, 'red');
+							showLaunchError('Could not load saved settings. Reload the page.');
+							return;
+						}
+						try {
+							launchStatus.textContent = 'Starting client…';
+							launchButtonProgress.style.width = '0%';
+							loadingBar.setAttribute('aria-valuenow', '0');
+							Module['canvas'].style.display = 'block';
+							Module.callMain(Module.arguments);
+						} catch (error) {
+							// Emscripten may unwind to the browser event loop when main starts.
+							if (error !== 'unwind') {
+								console.error(error);
+								showLaunchError('Could not start the client. Reload the page.');
+							}
+						}
+					});
+				} catch (error) {
+					console.error(error);
+					showLaunchError('Could not prepare client storage. Reload the page.');
+				}
+			});
+			controls.addEventListener('click', e => {
+				if (launchState === 'idle' && downloads.hidden && !e.target.closest('button, a')) {
+					launchButton.click();
+				}
+			});
+			document.addEventListener('keydown', e => {
+				if (!downloads.hidden && e.key === 'Escape') {
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					document.getElementById('back-button').click();
+				} else if (!downloads.hidden) {
+					e.stopImmediatePropagation();
+				} else if (launchState === 'idle' && downloads.hidden && !e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'Enter' || e.key === ' ') && !e.target.closest('button, a, input, textarea')) {
+					e.preventDefault();
+					launchButton.click();
+				}
+			}, true);
+
+			async function selectChannel(repository) {
+				const request = ++channelRequest;
+				selectedChannel = repository;
+				let channelName;
+				for (const button of channelButtons) {
+					button.setAttribute('aria-pressed', String(button.dataset.repository === repository));
+					if (button.dataset.repository === repository) {
+						channelName = button.textContent;
+					}
+				}
+				downloadCards.replaceChildren();
+				releaseLink.textContent = `${channelName} · GitHub releases`;
+				downloadStatus.textContent = 'Loading release files…';
+				releaseLink.href = `https://github.com/RushieClient/${repository}/releases`;
+				try {
+					if (!releases.has(repository)) {
+						releases.set(repository, fetch(`https://api.github.com/repos/RushieClient/${repository}/releases?per_page=1`, {
+							headers: {Accept: 'application/vnd.github+json'}
+						}).then(response => {
+							if (!response.ok) {
+								throw new Error(`GitHub: ${response.status}`);
+							}
+							return response.json();
+						}).catch(error => {
+							releases.delete(repository);
+							throw error;
+						}));
+					}
+					const [release] = await releases.get(repository);
+					if (downloads.hidden || request !== channelRequest) {
 						return;
 					}
-					Module['canvas'].style.display = "block";
-					var arguments = Module.arguments;
-					if (loadOnLaunch.file != null) {
-						const buffer = await loadOnLaunch.file.arrayBuffer();
-						const data = new Uint8Array(buffer);
-						FS.mkdirTree(`${loadOnLaunch.path}/upload`);
-						const filePath = `${loadOnLaunch.path}/upload/${sanitizeFilename(loadOnLaunch.file.name)}`;
-						FS.writeFile(filePath, data);
-						arguments.push(filePath);
-					} else if (loadOnLaunch.link != null) {
-						arguments.push(loadOnLaunch.link);
+					for (const asset of release?.assets || []) {
+						const name = asset.name.toLowerCase();
+						if (/server|source|symbols|debug|emscripten/.test(name)) {
+							continue;
+						}
+						let platform;
+						if (/android.*\.apk$/.test(name)) {
+							platform = ['Android', 'android'];
+						} else if (/(windows|win32|win64).*\.(zip|exe|msi)$/.test(name)) {
+							platform = ['Windows', 'windows'];
+						} else if (/(linux|ubuntu).*\.(tar\.(xz|gz)|appimage|deb)$/.test(name)) {
+							platform = ['Linux', 'linux'];
+						} else if (/(macos|osx|darwin).*\.(dmg|zip|tar\.(xz|gz))$/.test(name)) {
+							platform = ['macOS', 'macos'];
+						} else if (/\.ipa$/.test(name)) {
+							platform = ['iOS', 'ios'];
+						} else {
+							continue;
+						}
+						const arch = name.match(/aarch64|arm64|x86_64|x64|win64|win32|x86|armeabi-v7a/);
+						const card = document.createElement('a');
+						card.className = 'platform-card';
+						card.href = asset.browser_download_url;
+						card.title = asset.name;
+						const label = document.createElement('span');
+						label.className = 'platform-name';
+						label.textContent = platform[0] + (arch ? ` · ${arch[0].replace('win64', 'x64').replace('win32', 'x86')}` : '');
+						const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+						icon.setAttribute('aria-hidden', 'true');
+						icon.innerHTML = `<use href="platforms.svg#${platform[1]}"></use>`;
+						const size = document.createElement('span');
+						size.className = 'platform-size';
+						size.textContent = `${(asset.size / 1000000).toFixed(1)} MB`;
+						card.append(label, icon, size);
+						downloadCards.appendChild(card);
 					}
-					Module.callMain(arguments);
-				});
+					if (release?.tag_name) {
+						releaseLink.textContent = `${channelName} · Version ${release.tag_name.replace(/^v/i, '')} · GitHub releases`;
+					}
+					downloadStatus.textContent = downloadCards.childElementCount ? '' : 'No downloads are available for this channel yet. Check the releases page.';
+				} catch (error) {
+					if (!downloads.hidden && request === channelRequest) {
+						downloadStatus.textContent = 'Could not load downloads. Visit the GitHub releases page to download the client.';
+					}
+				}
+			}
+			downloadButton.addEventListener('click', () => {
+				if ((launchState !== 'idle' && launchState !== 'running') || downloads.open) {
+					return;
+				}
+				if (document.pointerLockElement) {
+					document.exitPointerLock();
+				}
+				downloads.hidden = false;
+				downloads.showModal();
+				controls.classList.add('downloads-open');
+				downloadButton.setAttribute('aria-expanded', 'true');
+				selectChannel(selectedChannel);
+				channelButtons[0].focus();
+			});
+			for (const button of channelButtons) {
+				button.addEventListener('click', () => selectChannel(button.dataset.repository));
+			}
+			document.getElementById('back-button').addEventListener('click', () => {
+				downloads.close();
+				downloads.hidden = true;
+				controls.classList.remove('downloads-open');
+				downloadButton.setAttribute('aria-expanded', 'false');
+				if (launchState === 'running') {
+					Module['canvas'].focus();
+					Module['canvas'].requestPointerLock()?.catch(() => {});
+				} else {
+					downloadButton.focus();
+				}
+			});
+			downloads.addEventListener('cancel', e => {
+				e.preventDefault();
+				document.getElementById('back-button').click();
+			});
+			downloads.addEventListener('click', e => {
+				// Closing the backdrop must not propagate to the click-to-start handler.
+				e.stopPropagation();
+				const bounds = downloads.getBoundingClientRect();
+				if (e.target === downloads && (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom)) {
+					document.getElementById('back-button').click();
+				}
 			});
 
-			// Handlers for pre-launch drop target
+			// File types accepted by the running client
 			function getDropFilePath(file) {
 				if (file.name.endsWith(".demo")) {
 					return `${homePath}/demos`;
@@ -368,72 +865,17 @@
 				return result;
 			}
 			document.addEventListener('dragover', e => {
-				if (e.target != dropTarget && e.target != Module['canvas']) {
-					// Prevent items from being dropped outside of the designated drop target and canvas.
+				if (e.target != Module['canvas']) {
+					// Prevent navigation when files are dropped outside the canvas.
 					e.preventDefault();
 					e.dataTransfer.dropEffect = "none";
 				}
 			}, true);
 			document.addEventListener('drop', e => {
-				if (e.target != dropTarget && e.target != Module['canvas']) {
+				if (e.target != Module['canvas']) {
 					e.preventDefault();
 				}
 			}, true);
-			dropTarget.addEventListener('dragover', e => {
-				e.preventDefault();
-				e.dataTransfer.dropEffect = "none";
-				if (!e.dataTransfer.items) {
-					return;
-				}
-				for (const item of e.dataTransfer.items) {
-					if (item.kind == 'file' || item.kind == 'string') {
-						e.dataTransfer.dropEffect = "copy";
-						dropTarget.setAttribute("drop-active", true);
-						return;
-					}
-				}
-			});
-			dropTarget.addEventListener('dragleave', e => {
-				dropTarget.removeAttribute("drop-active");
-			});
-			dropTarget.addEventListener('drop', async e => {
-				e.preventDefault();
-				const droppedItem = getDroppedItemFromDataTransfer(e.dataTransfer);
-				if (droppedItem.file != null) {
-					loadOnLaunch.file = droppedItem.file;
-					loadOnLaunch.path = droppedItem.path;
-					loadOnLaunch.link = null;
-					dropTargetStatus.textContent = `Selected file: ${droppedItem.file.name}`;
-				} else if (droppedItem.link != null) {
-					loadOnLaunch.file = null;
-					loadOnLaunch.path = null;
-					loadOnLaunch.link = droppedItem.link;
-					dropTargetStatus.textContent = `Selected link: ${droppedItem.link}`;
-				} else {
-					alert("The items you dropped are not supported. You can drop .demo and .map files, as well as ddnet:// links.");
-				}
-				dropTarget.removeAttribute("drop-active");
-			});
-
-			// Event handlers for pre-launch drop target file input
-			dropTarget.addEventListener('click', e => {
-				dropTargetFileInput.click();
-			})
-			dropTargetFileInput.addEventListener('change', e => {
-				if (e.target.files.length == 0) {
-					return;
-				}
-				const path = getDropFilePath(e.target.files[0]);
-				if (path == null) {
-					alert("The file you selected is not supported. You can select .demo and .map files.");
-					return;
-				}
-				loadOnLaunch.file = e.target.files[0];
-				loadOnLaunch.path = path;
-				loadOnLaunch.link = null;
-				dropTargetStatus.textContent = `Selected file: ${loadOnLaunch.file.name}`;
-			});
-
 			// Event handlers for canvas drop target
 			Module['canvas'].addEventListener('dragover', e => {
 				e.preventDefault();
@@ -466,6 +908,6 @@
 			});
 		</script>
 		<script src="local_server.js"></script>
-		<script async src="DDNet.js"></script>
+		<script async src="DDNet.js" onerror="showLaunchError('Could not load client files. Reload the page.')"></script>
 	</body>
 </html> 

@@ -45,6 +45,10 @@
 #include <cmath>
 #include <vector>
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+#include <emscripten/emscripten.h>
+#endif
+
 using namespace std::chrono_literals;
 
 ColorRGBA CMenus::ms_GuiColor;
@@ -818,6 +822,12 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 	const int CurLoadRenderCount = m_LoadingState.m_Current;
 	m_LoadingState.m_Current += IncreaseCounter;
 	dbg_assert(m_LoadingState.m_Current <= m_LoadingState.m_Total, "Invalid progress for RenderLoading");
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	EM_ASM({
+		if(Module['onClientLoading'])
+			Module['onClientLoading'](UTF8ToString($0), UTF8ToString($1), $2);
+	}, pCaption, pContent, m_LoadingState.m_Total > 0 ? CurLoadRenderCount / (float)m_LoadingState.m_Total : 0.0f);
+#endif
 	RenderLoadingDirect(pCaption, pContent, m_LoadingState.m_Total > 0 ? std::make_optional(CurLoadRenderCount / (float)m_LoadingState.m_Total) : std::nullopt);
 }
 
