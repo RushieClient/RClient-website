@@ -728,8 +728,27 @@
 					});
 				},
 				totalDependencies: 0,
+				setStatus() {
+					if (runtimeReady || !['idle', 'waiting'].includes(launchState)) {
+						return;
+					}
+					const downloads = Object.values(this.dataFileDownloads || {});
+					const loaded = downloads.reduce((sum, file) => sum + file.loaded, 0);
+					const total = downloads.reduce((sum, file) => sum + file.total, 0);
+					if (!total) {
+						return;
+					}
+					const progress = Math.min(100, Math.round(loaded * 100 / total));
+					launchStatus.textContent = `Downloading client data: ${(loaded / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB (${progress}%)`;
+					launchButtonProgress.style.width = `${progress}%`;
+					loadingBar.setAttribute('aria-valuenow', progress);
+				},
 				monitorRunDependencies(left) {
 					this.totalDependencies = Math.max(this.totalDependencies, left);
+					if (Object.keys(this.dataFileDownloads || {}).length) {
+						this.setStatus();
+						return;
+					}
 					const value = this.totalDependencies - left;
 					const progress = this.totalDependencies ? Math.round(value * 100 / this.totalDependencies) : 0;
 					launchButtonProgress.style.width = `${progress}%`;
@@ -797,8 +816,9 @@
 				launchState = 'waiting';
 				controls.classList.add('waiting');
 				loadingBar.hidden = false;
-				launchStatus.textContent = runtimeReady ? 'Preparing client' : 'Loading client';
+				launchStatus.textContent = runtimeReady ? 'Preparing client' : launchStatus.textContent || 'Loading client';
 				if (!runtimeReady) {
+					Module.setStatus();
 					return;
 				}
 				launchState = 'starting';

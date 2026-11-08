@@ -34,16 +34,12 @@ if (typeof window === 'undefined') {
 				throw new Error('Could not enable WebAssembly threads. Reload the page to try again.');
 			}
 			let timer;
+			launchStatus.textContent = 'Preparing browser';
 			try {
 				await Promise.race([
 					(async () => {
 						await navigator.serviceWorker.register(workerUrl, {updateViaCache: 'none'});
 						await navigator.serviceWorker.ready;
-						if (!navigator.serviceWorker.controller) {
-							await new Promise(resolve => {
-								navigator.serviceWorker.addEventListener('controllerchange', resolve, {once: true});
-							});
-						}
 					})(),
 					new Promise((_, reject) => {
 						timer = setTimeout(() => reject(new Error('Browser setup timed out. Reload the page.')), 20000);
@@ -60,6 +56,7 @@ if (typeof window === 'undefined') {
 			launchButton.click();
 		}
 		sessionStorage.removeItem(reloadKey);
+		launchStatus.textContent = 'Loading client';
 		const script = document.createElement('script');
 		script.src = new URL('DDNet.js', workerUrl).href;
 		script.onerror = () => showLaunchError('Could not load client files. Reload the page.');

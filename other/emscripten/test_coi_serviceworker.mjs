@@ -30,6 +30,7 @@ function browser(isolated, stored = null) {
 		},
 		location: {reload() { context.reloaded = true; }},
 		launchState: 'idle',
+		launchStatus: {textContent: ''},
 		launchButton: {click() { context.clicked = true; }},
 		showLaunchError: message => errors.push(message)
 	};
@@ -60,6 +61,28 @@ test('failed isolation cannot cause an automatic reload loop', async () => {
 	assert.equal(context.reloaded, undefined);
 	assert.equal(scripts.length, 0);
 	assert.match(errors[0], /Could not enable/);
+});
+
+test('active worker reloads even when the first page remains uncontrolled', async () => {
+	const {context, scripts, errors} = browser(false);
+	context.navigator.serviceWorker.controller = null;
+	await vm.runInNewContext(source, context);
+	assert.equal(context.reloaded, true);
+	assert.equal(scripts.length, 0);
+	assert.deepEqual(errors, []);
+});
+
+test('browser preparation times out after 20 seconds without loading WASM', async () => {
+	const {context, scripts, errors} = browser(false);
+	context.navigator.serviceWorker.ready = new Promise(() => {});
+	context.setTimeout = (callback, delay) => {
+		assert.equal(delay, 20000);
+		return setTimeout(callback, 1);
+	};
+	await vm.runInNewContext(source, context);
+	assert.match(errors[0], /Browser setup timed out/);
+	assert.equal(scripts.length, 0);
+	assert.equal(context.reloaded, undefined);
 });
 
 test('unsupported browsers and failed worker registration show recovery', async () => {
