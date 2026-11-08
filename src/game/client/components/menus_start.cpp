@@ -43,47 +43,6 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	CUIRect Button;
 	int NewPage = -1;
 
-	CUIRect ExtMenu;
-	MainView.VSplitLeft(30.0f, nullptr, &ExtMenu);
-	ExtMenu.VSplitLeft(100.0f, &ExtMenu, nullptr);
-
-	ExtMenu.HSplitBottom(20.0f, &ExtMenu, &Button);
-	static CButtonContainer s_DiscordButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_DiscordButton, Localize("Discord"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-	{
-		Client()->ViewLink(Localize("https://ddnet.org/discord"));
-	}
-
-	ExtMenu.HSplitBottom(5.0f, &ExtMenu, nullptr); // little space
-	ExtMenu.HSplitBottom(20.0f, &ExtMenu, &Button);
-	static CButtonContainer s_LearnButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_LearnButton, Localize("Learn"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-	{
-		Client()->ViewLink(Localize("https://wiki.ddnet.org/"));
-	}
-
-	ExtMenu.HSplitBottom(5.0f, &ExtMenu, nullptr); // little space
-	ExtMenu.HSplitBottom(20.0f, &ExtMenu, &Button);
-	static CButtonContainer s_TutorialButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_TutorialButton, Localize("Tutorial"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-	{
-		GameClient()->m_Menus.JoinTutorial();
-	}
-
-	ExtMenu.HSplitBottom(5.0f, &ExtMenu, nullptr); // little space
-	ExtMenu.HSplitBottom(20.0f, &ExtMenu, &Button);
-	static CButtonContainer s_WebsiteButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_WebsiteButton, Localize("Website"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
-	{
-		Client()->ViewLink("https://ddnet.org/");
-	}
-
-	ExtMenu.HSplitBottom(5.0f, &ExtMenu, nullptr); // little space
-	ExtMenu.HSplitBottom(20.0f, &ExtMenu, &Button);
-	static CButtonContainer s_NewsButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_NewsButton, Localize("News"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, g_Config.m_UiUnreadNews ? ColorRGBA(0.0f, 1.0f, 0.0f, 0.25f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || CheckHotKey(KEY_N))
-		NewPage = CMenus::PAGE_NEWS;
-
 	CUIRect Menu;
 	MainView.VMargin(VMargin, &Menu);
 	Menu.HSplitBottom(25.0f, &Menu, nullptr);
@@ -138,23 +97,6 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		{
 			GameClient()->m_LocalServer.RunServer({});
 		}
-	}
-
-	Menu.HSplitBottom(5.0f, &Menu, nullptr); // little space
-	Menu.HSplitBottom(40.0f, &Menu, &Button);
-	static CButtonContainer s_MapEditorButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_MapEditorButton, Localize("Editor"), 0, &Button, BUTTONFLAG_LEFT, g_Config.m_ClShowStartMenuImages ? "editor" : nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, GameClient()->Editor()->HasUnsavedData() ? ColorRGBA(0.0f, 1.0f, 0.0f, 0.25f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || CheckHotKey(KEY_E))
-	{
-		g_Config.m_ClEditor = 1;
-		Input()->MouseModeRelative();
-	}
-
-	Menu.HSplitBottom(5.0f, &Menu, nullptr); // little space
-	Menu.HSplitBottom(40.0f, &Menu, &Button);
-	static CButtonContainer s_DemoButton;
-	if(GameClient()->m_Menus.DoButton_Menu(&s_DemoButton, Localize("Demos"), 0, &Button, BUTTONFLAG_LEFT, g_Config.m_ClShowStartMenuImages ? "demos" : nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || CheckHotKey(KEY_D))
-	{
-		NewPage = CMenus::PAGE_DEMOS;
 	}
 
 	Menu.HSplitBottom(5.0f, &Menu, nullptr); // little space

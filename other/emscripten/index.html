@@ -12,10 +12,21 @@
 		<meta property="og:site_name" content="RClient">
 		<meta property="og:title" content="RClient - Custom DDNet Client">
 		<meta property="og:description" content="RClient (Rushie Client) is a custom DDNet client based on Tater Client, with additional features and customization. Available for Windows, Linux, macOS and Android.">
-		<meta name="twitter:card" content="summary">
+		<meta property="og:image" content="https://rushie-client.ru/og-image.png">
+		<meta property="og:image:type" content="image/png">
+		<meta property="og:image:width" content="1200">
+		<meta property="og:image:height" content="630">
+		<meta property="og:image:alt" content="RClient logo">
+		<meta name="twitter:card" content="summary_large_image">
 		<meta name="twitter:title" content="RClient - Custom DDNet Client">
 		<meta name="twitter:description" content="RClient (Rushie Client) is a custom DDNet client based on Tater Client, with additional features and customization. Available for Windows, Linux, macOS and Android.">
+		<meta name="twitter:image" content="https://rushie-client.ru/og-image.png">
+		<meta name="twitter:image:alt" content="RClient logo">
+		<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 		<link rel="icon" type="image/svg+xml" href="favicon.svg" sizes="any">
+		<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+		<link rel="manifest" href="manifest.webmanifest">
+		<meta name="theme-color" content="#003140">
 		<style>
 		@font-face {
 			font-family: 'Inter';
@@ -801,6 +812,20 @@
 							return;
 						}
 						try {
+							const demoDefaults = `${homePath}/.rclient-demo-defaults`;
+							if (!FS.analyzePath(demoDefaults).exists) {
+								Module.arguments.push(
+									'rc_edge_info_cords 1', 'rc_edge_info_jump 1',
+									'rc_notify_when_above_pos_player 1', 'rc_notify_when_same_pos_player 1',
+									'rc_notify_when_below_pos_player 1', 'rc_notify_when_pos_player_pos_y 55',
+									'tc_showhud_dummy_position 1', 'tc_showhud_dummy_speed 1', 'tc_showhud_dummy_angle 1',
+									'rc_showhud_advanced_dummy_actions 1', 'rc_show_recharge_bars 1',
+									'rc_nameplates_weapons 2', 'rc_nameplates_weapons_own 1',
+									'rc_nameplates_hook 4', 'rc_nameplates_fire 4', 'rc_chat_bubbles 1'
+								);
+								FS.writeFile(demoDefaults, '1');
+							}
+							Module.arguments.push('rc_hookthrough_alpha 50');
 							launchStatus.textContent = 'Starting client';
 							launchButtonProgress.style.width = '0%';
 							loadingBar.setAttribute('aria-valuenow', '0');

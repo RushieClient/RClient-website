@@ -653,6 +653,11 @@ void CGameClient::OnConnected()
 	ConfigManager()->ResetGameSettings();
 	LoadMapSettings();
 
+#if defined(CONF_PLATFORM_EMSCRIPTEN)
+	if(m_LocalServer.IsServerRunning() && str_comp(Map()->BaseName(), "RClientTest") == 0)
+		m_EdgeHelper.SetActive(true);
+#endif
+
 	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
 	{
 		Client()->SetLoadingStateDetail(IClient::LOADING_STATE_DETAIL_GETTING_READY);
