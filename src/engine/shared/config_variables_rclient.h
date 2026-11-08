@@ -256,4 +256,3 @@ MACRO_CONFIG_INT(RcVoiceSuperVolume, rc_voice_super_volume, 100, 0, 200, CFGFLAG
 
 // Entities
 MACRO_CONFIG_INT(RcHookthroughAlpha, rc_hookthrough_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Opacity of hookthrough walls in entities (0 invisible, 100 fully visible)")
-
