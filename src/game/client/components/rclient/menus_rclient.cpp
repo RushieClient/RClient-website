@@ -6,12 +6,17 @@
 
 #include <engine/font_icons.h>
 
+#include <game/client/animstate.h>
 #include <game/client/components/menus.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui_listbox.h>
 #include <game/localization.h>
 
 #include <algorithm>
+#include <cmath>
+#include <map>
+#include <set>
+#include <string>
 #include <vector>
 
 enum
@@ -49,6 +54,13 @@ const float MarginExtraSmall = 2.5f;
 const float MarginBetweenSections = 30.0f;
 const float MarginBetweenViews = 30.0f;
 
+// Height consumed by each common menu row, so tab sizes can be written in terms of widgets.
+static float TabHeightCheckBox(int Count = 1) { return LineSize * Count; }
+static float TabHeightRadioMenu(int Count = 1) { return (LineSize + 2.0f) * Count; }
+static float TabHeightKeyReader(int Count = 1) { return (LineSize + MarginExtraSmall) * Count; }
+static float TabHeightEditBox(int Count = 1) { return (LineSize + MarginExtraSmall) * Count; }
+static float TabHeightLine(int Count = 1) { return LineSize * Count; }
+
 static void SetFlag(int32_t &Flags, int n, bool Value)
 {
 	if(Value)
@@ -64,6 +76,16 @@ static bool IsFlagSet(int32_t Flags, int n)
 
 void CMenus::RenderSettingsRClient(CUIRect MainView)
 {
+	if(m_VoiceUsersPage)
+	{
+		RenderSettingsRClientVoiceUsers(MainView);
+		return;
+	}
+	if(m_FavoritesMapsPage)
+	{
+		RenderSettingsRClientFavoritesMaps(MainView);
+		return;
+	}
 	static int s_CurCustomTab = 0;
 
 	CUIRect TabBar, Button;
@@ -115,6 +137,194 @@ void CMenus::RenderSettingsRClient(CUIRect MainView)
 		RenderSettingsRClientSpecWheel(MainView);
 	if(s_CurCustomTab == RCLIENT_TAB_INFO)
 		RenderSettingsRClientInfo(MainView);
+}
+
+void CMenus::RenderSettingsRClientVoiceUsers(CUIRect MainView)
+{
+	CRCVoiceChat &Voice = GameClient()->m_RcVoiceChat;
+	CUIRect Header, BackButton;
+	MainView.HSplitTop(LineSize, &Header, &MainView);
+	Header.VSplitLeft(80.0f, &BackButton, &Header);
+	static CButtonContainer s_BackButton;
+	if(DoButton_Menu(&s_BackButton, RCLocalize("Back", "RClient"), 0, &BackButton))
+	{
+		m_VoiceUsersPage = false;
+		return;
+	}
+	Header.VSplitRight(80.0f, &Header, nullptr);
+	Ui()->DoLabel(&Header, RCLocalize("Voice users", "RClient"), 18.0f, TEXTALIGN_MC);
+	MainView.HSplitTop(Margin, nullptr, &MainView);
+
+	static int s_Tab = 0;
+	static CButtonContainer s_aTabs[2];
+	const char *apTabs[] = {RCLocalize("Connected", "RClient"), RCLocalize("Saved", "RClient")};
+	const int OldTab = s_Tab;
+	DoMenuSettingsBar(&MainView, apTabs, 2, s_aTabs, s_Tab, LineSize);
+	if(OldTab != s_Tab)
+		Ui()->SetActiveItem(nullptr);
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	struct SRow
+	{
+		std::string m_Key;
+		std::string m_Name;
+		bool m_Talking = false;
+		int m_ClientId = -1;
+	};
+	std::vector<SRow> vRows;
+	const auto vSaved = Voice.SavedUsers();
+	if(s_Tab == 0 && Voice.Connected())
+	{
+		for(const auto &Participant : Voice.Participants())
+		{
+			const int Id = Voice.ClientIdOf(Participant.m_Identity);
+			if(Id >= 0 && (Id == GameClient()->m_aLocalIds[0] || Id == GameClient()->m_aLocalIds[1] || Id == GameClient()->m_Snap.m_LocalClientId))
+				continue;
+			vRows.push_back({Participant.m_Identity, Voice.ParticipantName(Participant), Participant.m_Talking, Id});
+		}
+		std::sort(vRows.begin(), vRows.end(), [](const SRow &A, const SRow &B) {
+			const auto KeyA = VoiceLogic::CUserSettings::Key(A.m_Name.c_str());
+			const auto KeyB = VoiceLogic::CUserSettings::Key(B.m_Name.c_str());
+			return KeyA != KeyB ? KeyA < KeyB : A.m_Key < B.m_Key;
+		});
+	}
+	else if(s_Tab == 1)
+	{
+		for(const auto &User : vSaved)
+		{
+			int ClientId = -1;
+			const auto NameKey = VoiceLogic::CUserSettings::Key(User.m_Name.c_str());
+			for(int Id = 0; Id < MAX_CLIENTS; ++Id)
+			{
+				if(GameClient()->m_aClients[Id].m_Active && VoiceLogic::CUserSettings::Key(GameClient()->m_aClients[Id].m_aName) == NameKey)
+				{
+					ClientId = Id;
+					break;
+				}
+			}
+			vRows.push_back({NameKey, User.m_Name, false, ClientId});
+		}
+	}
+
+	// Row IDs and selections follow identities/names rather than list indices,
+	// so a join or leave cannot redirect a user's volume edit to another row.
+	static std::string s_aSelected[2];
+	struct SRowIds
+	{
+		CButtonContainer m_Select;
+		int m_Volume = 0;
+		CButtonContainer m_Mute;
+	};
+	static std::map<std::string, SRowIds> s_aRowIds[2];
+	static CListBox s_aLists[2];
+	auto &SelectedKey = s_aSelected[s_Tab];
+	auto &RowIds = s_aRowIds[s_Tab];
+	std::set<std::string> Keys;
+	int Selected = -1;
+	for(size_t i = 0; i < vRows.size(); ++i)
+	{
+		Keys.insert(vRows[i].m_Key);
+		if(vRows[i].m_Key == SelectedKey)
+			Selected = i;
+	}
+	for(auto It = RowIds.begin(); It != RowIds.end();)
+	{
+		if(!Keys.contains(It->first))
+		{
+			// Cancel a drag before its widget ID is destroyed by a participant leaving.
+			Ui()->SetActiveItem(nullptr);
+			It = RowIds.erase(It);
+		}
+		else
+			++It;
+	}
+	if(Selected == -1 && !SelectedKey.empty())
+	{
+		SelectedKey.clear();
+		Ui()->SetActiveItem(nullptr);
+	}
+
+	CUIRect Controls, List;
+	MainView.HSplitBottom(36.0f, &List, &Controls);
+	List.HSplitBottom(Margin, &List, nullptr);
+	auto &ListBox = s_aLists[s_Tab];
+	ListBox.DoStart(40.0f, vRows.size(), 1, 3, Selected, &List, true, IGraphics::CORNER_ALL, true);
+	for(const auto &Row : vRows)
+	{
+		auto &Ids = RowIds[Row.m_Key];
+		const CListboxItem Item = ListBox.DoNextItem(&Ids.m_Select);
+		if(!Item.m_Visible)
+			continue;
+		const auto Settings = Voice.UserSettings(Row.m_Name.c_str());
+		CUIRect Name, Skin, VolumeRow, MuteButton;
+		Item.m_Rect.VMargin(8.0f, &Name);
+		Name.VSplitRight(110.0f, &Name, &MuteButton);
+		Name.VSplitRight(Margin, &Name, nullptr);
+		Name.VSplitRight(Name.w * 0.52f, &Name, &VolumeRow);
+		Name.VSplitRight(Margin, &Name, nullptr);
+		Name.VSplitLeft(36.0f, &Skin, &Name);
+		CTeeRenderInfo TeeInfo;
+		if(Row.m_ClientId >= 0 && Row.m_ClientId < MAX_CLIENTS && GameClient()->m_aClients[Row.m_ClientId].m_Active)
+			TeeInfo = GameClient()->m_aClients[Row.m_ClientId].m_RenderInfo;
+		else
+			TeeInfo.Apply(GameClient()->m_Skins.Find("default"));
+		TeeInfo.m_Size = 32.0f;
+		vec2 Offset;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeInfo, Offset);
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), vec2(Skin.x + Skin.w / 2.0f, Skin.y + Skin.h / 2.0f + Offset.y));
+		TextRender()->TextColor(Settings.m_Muted ? ColorRGBA(1.0f, 0.55f, 0.55f, 1.0f) : (Row.m_Talking ? ColorRGBA(0.4f, 1.0f, 0.4f, 1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f)));
+		SLabelProperties NameProps;
+		NameProps.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&Name, Row.m_Name.c_str(), 14.0f, TEXTALIGN_ML, NameProps);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		VolumeRow.HMargin((VolumeRow.h - LineSize) / 2.0f, &VolumeRow);
+		MuteButton.HMargin((MuteButton.h - LineSize) / 2.0f, &MuteButton);
+		const int Volume = round_to_int(Ui()->DoScrollbarH(&Ids.m_Volume, &VolumeRow, Settings.m_Volume / 200.0f) * 200.0f);
+		if(Volume != Settings.m_Volume)
+			Voice.SetUserSettings(Row.m_Name.c_str(), Volume, Settings.m_Muted);
+		char aVolumeLabel[64];
+		str_format(aVolumeLabel, sizeof(aVolumeLabel), "%s: %d%%", RCLocalize("Volume", "RClient"), Volume);
+		const ColorRGBA MuteColor = Settings.m_Muted ? ColorRGBA(1.0f, 0.35f, 0.35f, 0.6f) : ColorRGBA(0.35f, 0.85f, 0.35f, 0.6f);
+		if(DoButton_Menu(&Ids.m_Mute, aVolumeLabel, 0, &MuteButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, MuteColor))
+			Voice.SetUserSettings(Row.m_Name.c_str(), Volume, !Settings.m_Muted);
+		GameClient()->m_Tooltips.DoToolTip(&Ids.m_Mute, &MuteButton, Settings.m_Muted ? RCLocalize("Unmute voice", "RClient") : RCLocalize("Mute voice", "RClient"));
+	}
+	const int NewSelected = ListBox.DoEnd();
+	if(NewSelected >= 0 && (size_t)NewSelected < vRows.size())
+	{
+		SelectedKey = vRows[NewSelected].m_Key;
+		Selected = NewSelected;
+	}
+	if(vRows.empty())
+		Ui()->DoLabel(&List, s_Tab == 0 ? RCLocalize("No connected users", "RClient") : RCLocalize("No saved users", "RClient"), 14.0f, TEXTALIGN_MC);
+
+	Controls.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.2f), IGraphics::CORNER_ALL, 5.0f);
+	Controls.Margin(8.0f, &Controls);
+	if(Selected < 0 || (size_t)Selected >= vRows.size())
+	{
+		Ui()->DoLabel(&Controls, RCLocalize("Select a user", "RClient"), 14.0f, TEXTALIGN_MC);
+		return;
+	}
+	const std::string Name = vRows[Selected].m_Name;
+	auto Settings = Voice.UserSettings(Name.c_str());
+	const auto NameKey = VoiceLogic::CUserSettings::Key(Name.c_str());
+	const bool Saved = std::any_of(vSaved.begin(), vSaved.end(), [&](const auto &User) { return VoiceLogic::CUserSettings::Key(User.m_Name.c_str()) == NameKey; });
+	CUIRect NameRow, SaveButton;
+	Controls.HSplitTop(LineSize, &NameRow, &Controls);
+	NameRow.VSplitRight(95.0f, &NameRow, &SaveButton);
+	Ui()->DoLabel(&NameRow, Name.c_str(), 14.0f, TEXTALIGN_ML);
+	static CButtonContainer s_SaveButton;
+	if(DoButton_Menu(&s_SaveButton, Saved ? RCLocalize("Remove", "RClient") : RCLocalize("Save", "RClient"), 0, &SaveButton))
+	{
+		if(Saved)
+		{
+			Voice.ForgetUser(Name.c_str());
+			if(s_Tab == 1)
+				SelectedKey.clear();
+			return;
+		}
+		Voice.SetUserSettings(Name.c_str(), Settings.m_Volume, Settings.m_Muted);
+	}
 }
 
 void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
@@ -178,7 +388,11 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_DUMMY_TABS, s_aPageTabs, s_CurDummyCustomTab, LineSize);
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		const float MBiggestTab = LineSize * 4.0f;
+		// Position: 4 checkboxes
+		// Clan Change: 2 margins + checkbox + 2 edit boxes + margin
+		const float MBiggestTab = std::max(
+			TabHeightCheckBox(4),
+			MarginSmall * 2.0f + TabHeightCheckBox() + TabHeightEditBox(2) + MarginExtraSmall);
 		const float MCurrentY = Column.y;
 		if(s_CurDummyCustomTab == DUMMY_TAB_POS)
 		{
@@ -242,7 +456,11 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_SCOREBOARD_TABS, s_aPageTabs, s_CurScoreboardCustomTab, LineSize);
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		const float MBiggestTab = LineSize * 3.0f;
+		// Popup: key reader + 2 checkboxes
+		// Friends: checkbox + slider
+		const float MBiggestTab = std::max(
+			TabHeightKeyReader() + TabHeightCheckBox(2),
+			TabHeightCheckBox() + TabHeightLine());
 		const float MCurrentY = Column.y;
 		if(s_CurScoreboardCustomTab == SCOREBOARD_TAB_POPUP)
 		{
@@ -297,7 +515,14 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 			Ui()->DoLabel(&Label, RCLocalize("idea from BestClient", "RClient"), Margin, TEXTALIGN_MC);
 		}
 
-		const float MBiggestTab = LineSize * 4.0f + 2.0f * 2.0f;
+		// Effects: 2 checkboxes + 2 radio menus
+		// AFK: 4 checkboxes
+		// Hitbox: radio menu + 3 rows
+		const float MBiggestTab = std::max({
+			TabHeightCheckBox(2) + TabHeightRadioMenu(2),
+			TabHeightCheckBox(4),
+			TabHeightRadioMenu() + TabHeightLine(3),
+		});
 		const float MCurrentY = Column.y;
 		if(s_CurPlayersCustomTab == PLAYERS_TAB_EFFECTS)
 		{
@@ -565,6 +790,16 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		g_Config.m_RcCustomAspectDisable ^= RcAspectDisable::CHAT;
 
 	Column.HSplitTop(LineSize, &Button, &Column);
+	static int s_AspectDisableVoiceIndicator = 0;
+	if(DoButton_CheckBox(&s_AspectDisableVoiceIndicator, RCLocalize("Disable for Voice indicator", "RClient"), g_Config.m_RcCustomAspectDisable & RcAspectDisable::VOICEINDICATOR, &Button))
+		g_Config.m_RcCustomAspectDisable ^= RcAspectDisable::VOICEINDICATOR;
+
+	Column.HSplitTop(LineSize, &Button, &Column);
+	static int s_AspectDisableVoiceOverlay = 0;
+	if(DoButton_CheckBox(&s_AspectDisableVoiceOverlay, RCLocalize("Disable for Voice overlay", "RClient"), g_Config.m_RcCustomAspectDisable & RcAspectDisable::VOICEOVERLAY, &Button))
+		g_Config.m_RcCustomAspectDisable ^= RcAspectDisable::VOICEOVERLAY;
+
+	Column.HSplitTop(LineSize, &Button, &Column);
 	static int s_AspectDisableEdgeinfo = 0;
 	if(DoButton_CheckBox(&s_AspectDisableEdgeinfo, RCLocalize("Disable for Edge info", "RClient"), g_Config.m_RcCustomAspectDisable & RcAspectDisable::EDGEINFO, &Button))
 		g_Config.m_RcCustomAspectDisable ^= RcAspectDisable::EDGEINFO;
@@ -592,10 +827,6 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcNotifyWhenAbovePosPlayer, RCLocalize("Notify when above player", "RClient"), &g_Config.m_RcNotifyWhenAbovePosPlayer, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcNotifyWhenSamePosPlayer, RCLocalize("Notify when same pos as player", "RClient"), &g_Config.m_RcNotifyWhenSamePosPlayer, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcNotifyWhenBelowPosPlayer, RCLocalize("Notify when below player", "RClient"), &g_Config.m_RcNotifyWhenBelowPosPlayer, &Column, LineSize);
-	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_RcNotifyWhenPosPlayerPosX, &g_Config.m_RcNotifyWhenPosPlayerPosX, &Button, RCLocalize("Text pos x", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
-	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_RcNotifyWhenPosPlayerPosY, &g_Config.m_RcNotifyWhenPosPlayerPosY, &Button, RCLocalize("Text pos y", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
 
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
 	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
@@ -618,6 +849,7 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 	DoLine_KeyReader(Column, s_ReaderButtonSpecGoRight, s_ClearButtonSpecGoRight, RCLocalize("Spec go Right", "RClient"), "+rc_spec_go_right");
 	DoLine_KeyReader(Column, s_ReaderButtonSpecGoUp, s_ClearButtonSpecGoUp, RCLocalize("Spec go Up", "RClient"), "+rc_spec_go_up");
 	DoLine_KeyReader(Column, s_ReaderButtonSpecGoDown, s_ClearButtonSpecGoDown, RCLocalize("Spec go Down", "RClient"), "+rc_spec_go_down");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcSpecClosestInSpec, RCLocalize("Allow click on players in /spec", "RClient"), &g_Config.m_RcSpecClosestInSpec, &Column, LineSize);
 
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
 	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
@@ -645,7 +877,11 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_HELP_TABS, s_aPageTabs, s_CurHelpCustomTab, LineSize);
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		const float MBiggestTab = LineSize * 13.0f + LineSize + (LineSize + 2.0f) * 2.0f + MarginSmall;
+		// Main: 11 rows + 2 radio menus
+		// Sort: 2 radio menus
+		const float MBiggestTab = std::max(
+			TabHeightLine(12) + TabHeightRadioMenu(2),
+			TabHeightRadioMenu(2));
 		const float MCurrentY = Column.y;
 
 		if(s_CurHelpCustomTab == HELP_TAB_MAIN)
@@ -674,19 +910,6 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcSaveAlphaInOtherTeamInSpec, RCLocalize("Fix cl_show_others_alpha in spec", "RClient"), &g_Config.m_RcSaveAlphaInOtherTeamInSpec, &Column, LineSize);
 			static int s_WeaponSlotsHelpId = 0;
 			DoButton_CheckBoxAutoVMarginAndSet(&s_WeaponSlotsHelpId, RCLocalize("Weapon slots", "RClient"), &g_Config.m_RcWeaponSlots, &Column, LineSize);
-			Column.HSplitTop(LineSize, &Button, &Column);
-			static CButtonContainer s_ReaderButtonHudEditor, s_ClearButtonHudEditor, s_OpenHudEditor;
-			int SOpenRcHudEditor = GameClient()->m_RcHudEditor.IsActive();
-			if(DoButton_Menu(&s_OpenHudEditor, "Open Hud Editor", SOpenRcHudEditor, &Button))
-			{
-				if(Client()->State() != IClient::STATE_OFFLINE)
-				{
-					GameClient()->m_Menus.SetActive(false);
-					GameClient()->m_RcHudEditor.SetActive(true);
-				}
-			}
-			Column.HSplitTop(MarginSmall, &Button, &Column);
-			DoLine_KeyReader(Column, s_ReaderButtonHudEditor, s_ClearButtonHudEditor, RCLocalize("Bind Hud Editor", "RClient"), "rc_toggle_hud_editor");
 			static CButtonContainer s_HookLineContinueColor, s_HookLineContinuePlayerColor;
 			DoButton_ColorPickerAutoVMargin(&s_HookLineContinueColor, RCLocalize("Continue hook line after hit block", "RClient"), &g_Config.m_RcHookLineContinueColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RcHookLineContinueColor)), &Column, LineSize, true, &g_Config.m_RcContinueHookLine);
 			DoButton_ColorPickerAutoVMargin(&s_HookLineContinuePlayerColor, RCLocalize("Continue hook line after hit player", "RClient"), &g_Config.m_RcHookLinePlayerContinueColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RcHookLinePlayerContinueColor)), &Column, LineSize, true, &g_Config.m_RcContinuePlayerHookLine);
@@ -748,8 +971,14 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_CHAT_TABS, s_aPageTabs, s_CurChatCustomTab, LineSize);
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		// const float MBiggestTab = LineSize * 7.0f + (LineSize + 2.0f) + (LineSize + MarginExtraSmall) * 2.0f;
-		const float MBiggestTab = LineSize * 4.0f + (LineSize + MarginSmall) * 4 + (LineSize + MarginExtraSmall) * 2.0f;
+		// Main: 5 rows
+		// Filter: radio menu + 7 rows + 2 edit boxes (worst case)
+		// Translate: 8 rows + 4 margins + 2 edit boxes (worst case)
+		const float MBiggestTab = std::max({
+			TabHeightLine(5),
+			TabHeightRadioMenu() + TabHeightLine(7) + TabHeightEditBox(2),
+			TabHeightLine(8) + MarginSmall * 4.0f + TabHeightEditBox(2),
+		});
 		const float MCurrentY = Column.y;
 		if(s_CurChatCustomTab == CHAT_TAB_MAIN)
 		{
@@ -964,6 +1193,8 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 	Column.HSplitTop(HeadlineHeight, &Label, &Column);
 	Ui()->DoLabel(&Label, RCLocalize("Nameplates", "RClient"), HeadlineFontSize, TEXTALIGN_MC);
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcNamePlatesVoice, RCLocalize("Show voice headphones", "RClient"), &g_Config.m_RcNamePlatesVoice, &Column, LineSize);
+	Column.HSplitTop(MarginSmall, nullptr, &Column);
 
 	{
 		enum
@@ -983,7 +1214,14 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_NAMEPLATES_TABS, s_aPageTabs, s_CurNameplatesCustomTab, LineSize);
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		const float MBiggestTab = LineSize * 5.0f + LineSize + (LineSize + 2.0f);
+		// Hook: radio menu + 2 rows
+		// Fire: radio menu + 3 rows + note
+		// Weapons: radio menu + 6 rows
+		const float MBiggestTab = std::max({
+			TabHeightRadioMenu() + TabHeightLine(2),
+			TabHeightRadioMenu() + TabHeightLine(3) + LineSize / 2.0f,
+			TabHeightRadioMenu() + TabHeightLine(6),
+		});
 		const float MCurrentY = Column.y;
 		if(s_CurNameplatesCustomTab == NAMEPLATE_TAB_HOOK)
 		{
@@ -1065,7 +1303,11 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 			Ui()->DoLabel(&Label, RCLocalize("idea from BestClient", "RClient"), Margin, TEXTALIGN_MC);
 		}
 
-		const float MBiggestTab = LineSize * 4.0f + LineSize * 2.0f + (LineSize + 2.0f);
+		// NonActive: 2 checkboxes + radio menu
+		// Spec: 6 rows + radio menu
+		const float MBiggestTab = std::max(
+			TabHeightCheckBox(2) + TabHeightRadioMenu(),
+			TabHeightLine(6) + TabHeightRadioMenu());
 		const float MCurrentY = Column.y;
 
 		if(s_CurAfkCustomTab == AFK_TAB_NONACTIVE)
@@ -1095,10 +1337,6 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 					{0, 1, 2},
 					g_Config.m_RcSoundOnMoveInSpec);
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcTextOnMoveInSpec, RCLocalize("Show text when moved in spec", "RClient"), &g_Config.m_RcTextOnMoveInSpec, &Column, LineSize);
-				Column.HSplitTop(LineSize, &Button, &Column);
-				Ui()->DoScrollbarOption(&g_Config.m_RcTextOnMoveInSpecPosX, &g_Config.m_RcTextOnMoveInSpecPosX, &Button, RCLocalize("Text pos x", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
-				Column.HSplitTop(LineSize, &Button, &Column);
-				Ui()->DoScrollbarOption(&g_Config.m_RcTextOnMoveInSpecPosY, &g_Config.m_RcTextOnMoveInSpecPosY, &Button, RCLocalize("Text pos y", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcTextOnMoveInSpecRemoveOnInput, RCLocalize("Remove text on any input", "RClient"), &g_Config.m_RcTextOnMoveInSpecRemoveOnInput, &Column, LineSize);
 			}
 		}
@@ -1214,10 +1452,6 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 	DoLine_KeyReader(Column, s_ReaderButtonEdgeInfo, s_ClearButtonEdgeInfo, RCLocalize("Toggle Edge info", "RClient"), "rc_toggle_edge_info");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcEdgeInfoCords, RCLocalize("Show coordinates info", "RClient"), &g_Config.m_RcEdgeInfoCords, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcEdgeInfoJump, RCLocalize("Show jump info", "RClient"), &g_Config.m_RcEdgeInfoJump, &Column, LineSize);
-	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_RcEdgeInfoPosX, &g_Config.m_RcEdgeInfoPosX, &Button, RCLocalize("Edge info X pos", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
-	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_RcEdgeInfoPosY, &g_Config.m_RcEdgeInfoPosY, &Button, RCLocalize("Edge info Y pos", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
 	static CButtonContainer s_EdgeInfoFreezeColor, s_EdgeInfoKillColor, s_EdgeInfoSafeColor;
 	DoButton_ColorPickerAutoVMargin(&s_EdgeInfoFreezeColor, RCLocalize("Above Freeze color", "RClient"), &g_Config.m_RcEdgeInfoColorFreeze, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RcEdgeInfoColorFreeze)), &Column, LineSize, false);
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
@@ -1237,10 +1471,24 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcShowhudPlayerCheckpoint, RCLocalize("Show checkpoint", "RClient"), &g_Config.m_RcShowhudPlayerCheckpoint, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcShowhudSmallerHud, RCLocalize("Smaller hud (angle,checkpoint)", "RClient"), &g_Config.m_RcShowhudSmallerHud, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcShowhudRampSpeedX, RCLocalize("Show ramp * VelX speed", "RClient"), &g_Config.m_RcShowhudRampSpeedX, &Column, LineSize);
 	Column.HSplitTop(LineSize, &Button, &Column);
 	static int s_HeartSizeHudId = 0;
 	Ui()->DoScrollbarOption(&s_HeartSizeHudId, &g_Config.m_RcSizeOfHeart, &Button, RCLocalize("Heart size", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcShowhudVotingPercent, RCLocalize("Show percent in vote", "RClient"), &g_Config.m_RcShowhudVotingPercent, &Column, LineSize);
+	Column.HSplitTop(LineSize, &Button, &Column);
+	static CButtonContainer s_ReaderButtonHudEditor, s_ClearButtonHudEditor, s_OpenHudEditor;
+	int SOpenRcHudEditor = GameClient()->m_RcHudEditor.IsActive();
+	if(DoButton_Menu(&s_OpenHudEditor, "Open Hud Editor", SOpenRcHudEditor, &Button))
+	{
+		if(Client()->State() != IClient::STATE_OFFLINE)
+		{
+			GameClient()->m_Menus.SetActive(false);
+			GameClient()->m_RcHudEditor.SetActive(true);
+		}
+	}
+	Column.HSplitTop(MarginSmall, &Button, &Column);
+	DoLine_KeyReader(Column, s_ReaderButtonHudEditor, s_ClearButtonHudEditor, RCLocalize("Bind Hud Editor", "RClient"), "rc_toggle_hud_editor");
 
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
 	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
@@ -1254,8 +1502,300 @@ void CMenus::RenderSettingsRClientSettings(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcEnableSwapTimer, RCLocalize("Enable swap timer", "RClient"), &g_Config.m_RcEnableSwapTimer, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcEnableSwapTimerOnLeftSide, RCLocalize("Swap timer on left side", "RClient"), &g_Config.m_RcEnableSwapTimerOnLeftSide, &Column, LineSize);
-	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_RcEnableSwapTimerPosY, &g_Config.m_RcEnableSwapTimerPosY, &Button, RCLocalize("Swap timer pos y", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
+
+	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
+	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
+
+	// ***** Voice chat ***** //
+	Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+	s_SectionBoxes.push_back(Column);
+	Column.HSplitTop(HeadlineHeight, &Label, &Column);
+	Ui()->DoLabel(&Label, RCLocalize("Voice chat", "RClient"), HeadlineFontSize, TEXTALIGN_MC);
+	Column.HSplitTop(Margin, &Label, &Column);
+	Ui()->DoLabel(&Label, RCLocalize("Full ai vibecoded", "RClient"), Margin, TEXTALIGN_MC);
+	Column.HSplitTop(MarginSmall, nullptr, &Column);
+	{
+		enum
+		{
+			VOICE_TAB_GENERAL = 0,
+			VOICE_TAB_DEVICES,
+			VOICE_TAB_SOUND,
+			VOICE_TAB_ADVANCED,
+			NUMBER_OF_VOICE_TABS
+		};
+		static int s_CurVoiceTab = VOICE_TAB_GENERAL;
+		static int s_aCurVoiceSubTabs[NUMBER_OF_VOICE_TABS] = {};
+		static CButtonContainer s_aVoiceTabs[NUMBER_OF_VOICE_TABS];
+		static CButtonContainer s_aaVoiceSubTabs[NUMBER_OF_VOICE_TABS][3];
+		const char *apTabNames[NUMBER_OF_VOICE_TABS] = {
+			RCLocalize("General", "RClient"),
+			RCLocalize("Devices", "RClient"),
+			RCLocalize("Sound", "RClient"),
+			RCLocalize("Advanced", "RClient")};
+		const char *aapSubTabNames[NUMBER_OF_VOICE_TABS][3] = {
+			{RCLocalize("Settings", "RClient"), RCLocalize("HUD", "RClient"), RCLocalize("Binds", "RClient")},
+			{nullptr, nullptr, nullptr},
+			{RCLocalize("Players", "RClient"), RCLocalize("Distance", "RClient"), RCLocalize("Stereo", "RClient")},
+			{nullptr, nullptr, nullptr}};
+		const int aSubTabCounts[NUMBER_OF_VOICE_TABS] = {3, 0, 3, 0};
+		DoMenuSettingsBar(&Column, apTabNames, NUMBER_OF_VOICE_TABS, s_aVoiceTabs, s_CurVoiceTab, LineSize);
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+		const float MCurrentY = Column.y;
+		if(aSubTabCounts[s_CurVoiceTab] > 0)
+			DoMenuSettingsBar(&Column, aapSubTabNames[s_CurVoiceTab], aSubTabCounts[s_CurVoiceTab], s_aaVoiceSubTabs[s_CurVoiceTab], s_aCurVoiceSubTabs[s_CurVoiceTab], LineSize);
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+
+		const int SubTab = s_aCurVoiceSubTabs[s_CurVoiceTab];
+		// Keep connection and player controls at the same position on every tab.
+		const float MBiggestTab = MarginSmall + std::max({
+								TabHeightCheckBox(6) + TabHeightRadioMenu(2) + TabHeightLine(2) + MarginSmall,
+								TabHeightLine(3) + TabHeightCheckBox(3),
+								TabHeightLine(3) + TabHeightKeyReader(3),
+								TabHeightLine(9) + MarginSmall + 14.0f,
+								TabHeightLine(7) + MarginSmall,
+								TabHeightEditBox() + TabHeightCheckBox() + TabHeightLine(3),
+							});
+		static std::vector<CRCVoiceChat::SDevice> s_avDevices[2];
+		static CUi::SDropDownState s_aDeviceStates[2];
+		static CScrollRegion s_aDeviceScrollRegions[2];
+		static bool s_aLoaded[2] = {};
+		auto RenderVoiceDevice = [&](bool Capture) {
+			const int Device = Capture ? 0 : 1;
+			auto &vDevices = s_avDevices[Device];
+			if(!s_aLoaded[Device])
+			{
+				vDevices = Capture ? GameClient()->m_RcVoiceChat.MicDevices() : GameClient()->m_RcVoiceChat.PlayoutDevices();
+				if(vDevices.empty())
+					vDevices.push_back({"System default", ""});
+				s_aLoaded[Device] = true;
+			}
+			char *pCurrent = Capture ? g_Config.m_RcVoiceMicDevice : g_Config.m_RcVoicePlayoutDevice;
+			std::vector<const char *> vpNames;
+			int Selected = -1;
+			for(size_t i = 0; i < vDevices.size(); ++i)
+			{
+				vpNames.push_back(vDevices[i].m_Id.empty() ? RCLocalize("System default", "RClient") : vDevices[i].m_Name.c_str());
+				if(vDevices[i].m_Id == pCurrent || (!vDevices[i].m_Id.empty() && str_startswith(pCurrent, "sdl:") && vDevices[i].m_Name == pCurrent + 4))
+					Selected = i;
+			}
+			if(Selected < 0)
+			{
+				Selected = vpNames.size();
+				vpNames.push_back(RCLocalize("Saved device unavailable (system default)", "RClient"));
+			}
+			Column.HSplitTop(LineSize, &Button, &Column);
+			Button.VSplitMid(&Label, &Button);
+			Ui()->DoLabel(&Label, Capture ? RCLocalize("Microphone", "RClient") : RCLocalize("Speakers / headphones", "RClient"), EditBoxFontSize, TEXTALIGN_ML);
+			s_aDeviceStates[Device].m_SelectionPopupContext.m_pScrollRegion = &s_aDeviceScrollRegions[Device];
+			const int NewSelected = Ui()->DoDropDown(&Button, Selected, vpNames.data(), vpNames.size(), s_aDeviceStates[Device]);
+			if(NewSelected != Selected && NewSelected >= 0 && (size_t)NewSelected < vDevices.size())
+				str_copy(pCurrent, vDevices[NewSelected].m_Id.c_str(), Capture ? sizeof(g_Config.m_RcVoiceMicDevice) : sizeof(g_Config.m_RcVoicePlayoutDevice));
+		};
+		if(s_CurVoiceTab == VOICE_TAB_GENERAL)
+		{
+			if(SubTab == 0)
+			{
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceAutoConnect, RCLocalize("Auto connect on server join", "RClient"), &g_Config.m_RcVoiceAutoConnect, &Column, LineSize);
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoiceMicVolume, &g_Config.m_RcVoiceMicVolume, &Button, RCLocalize("Microphone volume (%)", "RClient"), 0, 300, &CUi::ms_LinearScrollbarScale, 0);
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoiceVolume, &g_Config.m_RcVoiceVolume, &Button, RCLocalize("Headphone volume (%)", "RClient"), 0, 400, &CUi::ms_LinearScrollbarScale, 0);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceMuted, RCLocalize("Mute my microphone", "RClient"), &g_Config.m_RcVoiceMuted, &Column, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceDeafened, RCLocalize("Mute headphones", "RClient"), &g_Config.m_RcVoiceDeafened, &Column, LineSize);
+			}
+			else if(SubTab == 1)
+			{
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceIndicator, RCLocalize("Show voice indicator", "RClient"), &g_Config.m_RcVoiceIndicator, &Column, LineSize);
+				if(g_Config.m_RcVoiceIndicator)
+				{
+					CUIRect HudOptions = Column;
+					HudOptions.VSplitLeft(Margin, nullptr, &HudOptions);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceStatus, RCLocalize("Show voice status and ping", "RClient"), &g_Config.m_RcVoiceStatus, &HudOptions, LineSize);
+					Column.HSplitTop(LineSize, nullptr, &Column);
+				}
+				Column.HSplitTop(MarginSmall, nullptr, &Column);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceOverlay, RCLocalize("Show voice overlay", "RClient"), &g_Config.m_RcVoiceOverlay, &Column, LineSize);
+				if(g_Config.m_RcVoiceOverlay)
+				{
+					static std::vector<CButtonContainer> s_vVoiceOverlayModes(2);
+					DoLine_RadioMenu(Column, RCLocalize("Show players", "RClient"), s_vVoiceOverlayModes,
+						{RCLocalize("Speaking", "RClient"), RCLocalize("Connected", "RClient")}, {0, 1}, g_Config.m_RcVoiceOverlayMode);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceOverlayMuted, RCLocalize("Show players muted by me", "RClient"), &g_Config.m_RcVoiceOverlayMuted, &Column, LineSize);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceOverlaySkin, RCLocalize("Show player skins", "RClient"), &g_Config.m_RcVoiceOverlaySkin, &Column, LineSize);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceOverlayDirection, RCLocalize("Show player direction", "RClient"), &g_Config.m_RcVoiceOverlayDirection, &Column, LineSize);
+					static std::vector<CButtonContainer> s_vVoiceBackgroundModes(2);
+					DoLine_RadioMenu(Column, RCLocalize("Background", "RClient"), s_vVoiceBackgroundModes,
+						{RCLocalize("Per player", "RClient"), RCLocalize("Shared", "RClient")}, {0, 1}, g_Config.m_RcVoiceOverlaySharedBackground);
+					static CButtonContainer s_VoiceOverlayBackgroundColor;
+					DoButton_ColorPickerAutoVMargin(&s_VoiceOverlayBackgroundColor, RCLocalize("Overlay background", "RClient"), &g_Config.m_RcVoiceOverlayBackgroundColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RcVoiceOverlayBackgroundColor, true)), &Column, LineSize, true);
+				}
+			}
+			else
+			{
+				static CButtonContainer s_aVoiceBindReaders[3], s_aVoiceBindClearButtons[3];
+				DoLine_KeyReader(Column, s_aVoiceBindReaders[0], s_aVoiceBindClearButtons[0], RCLocalize("Talk (hold)", "RClient"), "+rc_voice_ptt");
+				DoLine_KeyReader(Column, s_aVoiceBindReaders[1], s_aVoiceBindClearButtons[1], RCLocalize("Mic mute", "RClient"), "rc_voice_toggle_mute");
+				DoLine_KeyReader(Column, s_aVoiceBindReaders[2], s_aVoiceBindClearButtons[2], RCLocalize("Incoming voice mute", "RClient"), "rc_voice_toggle_deafen");
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoicePttReleaseDelay, &g_Config.m_RcVoicePttReleaseDelay, &Button, RCLocalize("PTT release delay (ms)", "RClient"), 0, 1000, &CUi::ms_LinearScrollbarScale, 0);
+				GameClient()->m_Tooltips.DoToolTip(&g_Config.m_RcVoicePttReleaseDelay, &Button, RCLocalize("Keep sending briefly after releasing the talk key to preserve word endings. 0 disables the delay.", "RClient"));
+			}
+		}
+		else if(s_CurVoiceTab == VOICE_TAB_DEVICES)
+		{
+			RenderVoiceDevice(true);
+			RenderVoiceDevice(false);
+			Column.HSplitTop(LineSize, &Button, &Column);
+			static CButtonContainer s_RefreshVoiceDevices;
+			if(DoButton_Menu(&s_RefreshVoiceDevices, RCLocalize("Refresh voice devices", "RClient"), 0, &Button))
+			{
+				for(int Device = 0; Device < 2; ++Device)
+				{
+					Ui()->ClosePopupMenu(&s_aDeviceStates[Device].m_SelectionPopupContext);
+					s_aDeviceStates[Device].m_SelectionPopupContext.Reset();
+					s_aLoaded[Device] = false;
+				}
+			}
+			Column.HSplitTop(LineSize, &Label, &Column);
+			Ui()->DoLabel(&Label, RCLocalize("Device changes apply on next voice connection", "RClient"), EditBoxFontSize, TEXTALIGN_ML);
+			Column.HSplitTop(LineSize, &Button, &Column);
+			Ui()->DoScrollbarOption(&g_Config.m_RcVoiceMicVolume, &g_Config.m_RcVoiceMicVolume, &Button, RCLocalize("Microphone volume (%)", "RClient"), 0, 300, &CUi::ms_LinearScrollbarScale, 0);
+			auto &Voice = GameClient()->m_RcVoiceChat;
+			Voice.KeepMicrophoneTestVisible();
+			Column.HSplitTop(MarginSmall, nullptr, &Column);
+			Column.HSplitTop(LineSize, &Button, &Column);
+			static CButtonContainer s_MicrophoneTestButton;
+			const bool Testing = Voice.MicrophoneTesting();
+			if(!Testing && (Voice.Connected() || Voice.Connecting()))
+				Ui()->DoLabel(&Button, RCLocalize("Disconnect voice to test the microphone", "RClient"), EditBoxFontSize, TEXTALIGN_ML);
+			else if(DoButton_Menu(&s_MicrophoneTestButton, Testing ? RCLocalize("Stop microphone test", "RClient") : RCLocalize("Start microphone test", "RClient"), 0, &Button))
+			{
+				if(Testing)
+					Voice.StopMicrophoneTest();
+				else
+					Voice.StartMicrophoneTest();
+			}
+			if(Testing)
+			{
+				Column.HSplitTop(LineSize, &Button, &Column);
+				static CButtonContainer s_ListenToMicrophone;
+				if(DoButton_CheckBox(&s_ListenToMicrophone, RCLocalize("Listen to yourself", "RClient"), Voice.MicrophoneTestListening(), &Button))
+					Voice.SetMicrophoneTestListening(!Voice.MicrophoneTestListening());
+			}
+			Column.HSplitTop(LineSize, &Label, &Column);
+			Ui()->DoLabel(&Label, RCLocalize("Microphone level", "RClient"), FontSize, TEXTALIGN_ML);
+			CUIRect Meter, Fill;
+			Column.HSplitTop(14.0f, &Meter, &Column);
+			Meter.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.3f), IGraphics::CORNER_ALL, 3.0f);
+			const float Peak = Voice.MicrophoneTestLevel();
+			const float Level = Peak > 0.0f ? std::clamp((20.0f * std::log10(Peak) + 60.0f) / 60.0f, 0.0f, 1.0f) : 0.0f;
+			Meter.Margin(2.0f, &Fill);
+			Fill.w *= Level;
+			if(Fill.w > 0.0f)
+				Fill.Draw(Peak >= 0.95f ? ColorRGBA(1.0f, 0.3f, 0.3f, 0.9f) : ColorRGBA(0.35f, 0.85f, 0.35f, 0.9f), IGraphics::CORNER_ALL, 2.0f);
+			Column.HSplitTop(LineSize, &Label, &Column);
+			Ui()->DoLabel(&Label, RCLocalize("Local playback only. Use headphones.", "RClient"), EditBoxFontSize, TEXTALIGN_ML);
+		}
+		else if(s_CurVoiceTab == VOICE_TAB_SOUND)
+		{
+			Column.HSplitTop(LineSize, &Button, &Column);
+			Ui()->DoScrollbarOption(&g_Config.m_RcVoiceVolume, &g_Config.m_RcVoiceVolume, &Button, RCLocalize("Headphone volume (%)", "RClient"), 0, 400, &CUi::ms_LinearScrollbarScale, 0);
+			Column.HSplitTop(MarginSmall, nullptr, &Column);
+			if(SubTab == 0)
+			{
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoiceUnpositionedVolume, &g_Config.m_RcVoiceUnpositionedVolume, &Button, RCLocalize("Players without a position (%)", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoiceSpectatorVolume, &g_Config.m_RcVoiceSpectatorVolume, &Button, RCLocalize("Spectator voice volume (%)", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoiceOtherTeamVolume, &g_Config.m_RcVoiceOtherTeamVolume, &Button, RCLocalize("Other teams voice volume (%)", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
+				Column.HSplitTop(LineSize, &Button, &Column);
+				Ui()->DoScrollbarOption(&g_Config.m_RcVoiceSuperVolume, &g_Config.m_RcVoiceSuperVolume, &Button, RCLocalize("TEAM_SUPER voice volume (%)", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
+			}
+			else
+			{
+				if(SubTab == 1)
+				{
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceSpatial, RCLocalize("Fade voice with distance", "RClient"), &g_Config.m_RcVoiceSpatial, &Column, LineSize);
+					Column.HSplitTop(MarginSmall, nullptr, &Column);
+					Column.HSplitTop(LineSize, &Button, &Column);
+					g_Config.m_RcVoiceMinRadius = std::clamp(g_Config.m_RcVoiceMinRadius, 0, g_Config.m_RcVoiceRadius - 1);
+					if(Ui()->DoScrollbarOption(&g_Config.m_RcVoiceMinRadius, &g_Config.m_RcVoiceMinRadius, &Button, RCLocalize("Full volume until (tiles)", "RClient"), 0, 199, &CUi::ms_LinearScrollbarScale, 0))
+						g_Config.m_RcVoiceRadius = std::max(g_Config.m_RcVoiceRadius, g_Config.m_RcVoiceMinRadius + 1);
+					GameClient()->m_Tooltips.DoToolTip(&g_Config.m_RcVoiceMinRadius, &Button, RCLocalize("Nearby voices stay at full volume. Fading starts after this distance.", "RClient"));
+					Column.HSplitTop(LineSize, &Button, &Column);
+					if(Ui()->DoScrollbarOption(&g_Config.m_RcVoiceRadius, &g_Config.m_RcVoiceRadius, &Button, RCLocalize("Minimum volume from (tiles)", "RClient"), 1, 200, &CUi::ms_LinearScrollbarScale, 0))
+						g_Config.m_RcVoiceMinRadius = std::min(g_Config.m_RcVoiceMinRadius, g_Config.m_RcVoiceRadius - 1);
+					GameClient()->m_Tooltips.DoToolTip(&g_Config.m_RcVoiceRadius, &Button, RCLocalize("At this distance and farther, voices stay at the minimum volume.", "RClient"));
+					Column.HSplitTop(LineSize, &Button, &Column);
+					Ui()->DoScrollbarOption(&g_Config.m_RcVoiceMinVolume, &g_Config.m_RcVoiceMinVolume, &Button, RCLocalize("Minimum volume (%)", "RClient"), 0, 100, &CUi::ms_LinearScrollbarScale, 0);
+					GameClient()->m_Tooltips.DoToolTip(&g_Config.m_RcVoiceMinVolume, &Button, RCLocalize("Volume of distant players after fading. Set to 0% to mute them.", "RClient"));
+				}
+				else
+				{
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceStereo, RCLocalize("Stereo (left/right)", "RClient"), &g_Config.m_RcVoiceStereo, &Column, LineSize);
+					Column.HSplitTop(MarginSmall, nullptr, &Column);
+					Column.HSplitTop(LineSize, &Button, &Column);
+					Ui()->DoScrollbarOption(&g_Config.m_RcVoiceStereoWidth, &g_Config.m_RcVoiceStereoWidth, &Button, RCLocalize("Stereo strength (%)", "RClient"), 0, 200, &CUi::ms_LinearScrollbarScale, 0);
+					Column.HSplitTop(LineSize, &Button, &Column);
+					Ui()->DoScrollbarOption(&g_Config.m_RcVoiceStereoRadius, &g_Config.m_RcVoiceStereoRadius, &Button, RCLocalize("Left/right distance (tiles)", "RClient"), 1, 200, &CUi::ms_LinearScrollbarScale, 0);
+				}
+			}
+		}
+		else if(s_CurVoiceTab == VOICE_TAB_ADVANCED)
+		{
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcVoiceRoomMode, RCLocalize("Custom room (name@server)", "RClient"), &g_Config.m_RcVoiceRoomMode, &Column, LineSize);
+
+			{
+				CUIRect Box;
+				Column.HSplitTop(LineSize + MarginExtraSmall, &Box, &Column);
+				Box.VSplitMid(&Label, &Button);
+				Ui()->DoLabel(&Label, RCLocalize("Custom room name", "RClient"), FontSize, TEXTALIGN_ML);
+				static CLineInput s_RoomInput(g_Config.m_RcVoiceRoomName, sizeof(g_Config.m_RcVoiceRoomName));
+				Ui()->DoEditBox(&s_RoomInput, &Button, EditBoxFontSize);
+			}
+			Column.HSplitTop(LineSize, &Label, &Column);
+			Ui()->DoLabel(&Label, RCLocalize("Empty name uses the game server room", "RClient"), EditBoxFontSize, TEXTALIGN_ML);
+			Column.HSplitTop(LineSize, &Label, &Column);
+			Ui()->DoLabel(&Label, RCLocalize("Room changes apply on next voice connection", "RClient"), EditBoxFontSize, TEXTALIGN_ML);
+		}
+		if(MBiggestTab > Column.y - MCurrentY)
+			Column.HSplitTop(MBiggestTab - (Column.y - MCurrentY), nullptr, &Column);
+
+		CRCVoiceChat &VoiceChat = GameClient()->m_RcVoiceChat;
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+		Column.HSplitTop(LineSize, &Button, &Column);
+		static CButtonContainer s_VoiceUsersButton;
+		if(DoButton_Menu(&s_VoiceUsersButton, RCLocalize("Player volume and mute", "RClient"), 0, &Button))
+			m_VoiceUsersPage = true;
+
+		const std::string VoiceError = VoiceChat.LastError();
+		if(!VoiceError.empty())
+		{
+			char aError[128];
+			str_copy(aError, VoiceError.c_str(), 120);
+			Column.HSplitTop(LineSize, &Label, &Column);
+			TextRender()->TextColor(1.0f, 0.55f, 0.55f, 1.0f);
+			Ui()->DoLabel(&Label, aError, EditBoxFontSize, TEXTALIGN_ML);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+		Column.HSplitTop(LineSize, &Button, &Column);
+		static CButtonContainer s_VoiceConnectBtn;
+		const bool VoiceConnected = VoiceChat.Connected();
+		const bool VoiceConnecting = VoiceChat.Connecting();
+		const bool VoiceActive = VoiceConnected || VoiceConnecting;
+		if(VoiceChat.MicrophoneTesting())
+			Ui()->DoLabel(&Button, RCLocalize("Microphone test active", "RClient"), FontSize, TEXTALIGN_MC);
+		else if(DoButton_Menu(&s_VoiceConnectBtn, VoiceConnected ? RCLocalize("Disconnect voice", "RClient") : (VoiceConnecting ? RCLocalize("Cancel connecting", "RClient") : RCLocalize("Connect voice", "RClient")), 0, &Button))
+		{
+			if(VoiceActive)
+				VoiceChat.Disconnect();
+			else
+				VoiceChat.Connect();
+		}
+	}
 
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
 	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
@@ -1602,6 +2142,13 @@ void CMenus::RenderSettingsRClientInfo(CUIRect MainView)
 	{
 		GameClient()->m_RClient.RcCrashClient();
 	}
+	RightView.HSplitBottom(MarginSmall, &RightView, nullptr);
+	RightView.HSplitBottom(LineSize, &RightView, &Button);
+	static CButtonContainer s_FavoriteMapsList;
+	if(DoButton_Menu(&s_FavoriteMapsList, RCLocalize("Favorite Maps"), 0, &Button))
+	{
+		m_FavoritesMapsPage = true;
+	}
 }
 
 CUi::EPopupMenuFunctionResult CMenusRClientConfirmAspect::Render(void *pContext, CUIRect View, bool Active)
@@ -1816,4 +2363,187 @@ void CMenus::RenderSettingsRClientSpecWheel(CUIRect MainView)
 
 	LeftView.HSplitBottom(LineSize, &LeftView, &Label);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcResetBindWheelMouse, RCLocalize("Reset position of mouse when opening specwheel", "RClient"), &g_Config.m_TcResetBindWheelMouse, &Label, LineSize);
+}
+
+void CMenus::RenderSettingsRClientFavoritesMaps(CUIRect MainView)
+{
+	CUIRect Header, BackButton;
+	MainView.HSplitTop(LineSize, &Header, &MainView);
+	Header.VSplitLeft(80.0f, &BackButton, &Header);
+	static CButtonContainer s_BackButton;
+	if(DoButton_Menu(&s_BackButton, RCLocalize("Back", "RClient"), 0, &BackButton))
+	{
+		m_FavoritesMapsPage = false;
+		return;
+	}
+	Header.VSplitRight(80.0f, &Header, nullptr);
+	Ui()->DoLabel(&Header, RCLocalize("Favorite Maps", "RClient"), 18.0f, TEXTALIGN_MC);
+	MainView.HSplitTop(Margin, nullptr, &MainView);
+
+	const auto &vMaps = GameClient()->m_RClient.FavoriteMaps();
+	static CListBox s_ListBox;
+	static int s_SelectedMap = -1;
+	s_SelectedMap = std::clamp(s_SelectedMap, -1, static_cast<int>(vMaps.size()) - 1);
+
+	static CLineInputBuffered<128> s_MapInput;
+	static CLineInputBuffered<256> s_MapperInput;
+	static CLineInputBuffered<128> s_CommunityInput;
+	CUIRect Controls, Details;
+	MainView.HSplitBottom(24.0f, &MainView, &Controls);
+	MainView.HSplitBottom(Margin, &MainView, nullptr);
+
+	char aDetail[512];
+	str_format(aDetail, sizeof(aDetail), "%s: DDRaceNetwork", RCLocalize("Community"));
+	const float DetailsWidth = std::ceil(TextRender()->TextWidth(FontSize, aDetail)) + Margin * 2.0f + 1.0f;
+	MainView.VSplitRight(DetailsWidth, &MainView, &Details);
+	MainView.VSplitRight(Margin, &MainView, nullptr);
+
+	SLabelProperties Props;
+	Props.m_EllipsisAtEnd = true;
+	Props.m_EnableWidthCheck = false;
+
+	CUIRect Name, Mapper, Community, Date;
+	MainView.HSplitTop(28.0f, &Header, &MainView);
+	Header.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.3f), IGraphics::CORNER_T, 5.0f);
+	Header.VSplitRight(s_ListBox.ScrollbarWidthMax(), &Header, nullptr);
+	Header.VMargin(4.0f, &Header);
+	const float CellPadding = 8.0f;
+	const float CommunityWidth = std::ceil(std::max(TextRender()->TextWidth(EditBoxFontSize, RCLocalize("Community")), TextRender()->TextWidth(EditBoxFontSize, "DDRaceNetwork"))) + CellPadding + 1.0f;
+	const float DateWidth = std::ceil(TextRender()->TextWidth(EditBoxFontSize, "8888-88-88 88:88")) + CellPadding + 1.0f;
+	const float MapperWidth = DateWidth;
+
+	Header.VSplitRight(DateWidth, &Header, &Date);
+	Header.VSplitRight(CommunityWidth, &Header, &Community);
+	Header.VSplitRight(MapperWidth, &Name, &Mapper);
+	Name.VMargin(4.0f, &Name);
+	Mapper.VMargin(4.0f, &Mapper);
+	Community.VMargin(4.0f, &Community);
+	Date.VMargin(4.0f, &Date);
+	Props.m_MaxWidth = Name.w;
+	Ui()->DoLabel(&Name, RCLocalize("Map"), EditBoxFontSize, TEXTALIGN_ML, Props);
+	Props.m_MaxWidth = Mapper.w;
+	Ui()->DoLabel(&Mapper, RCLocalize("Mapper"), EditBoxFontSize, TEXTALIGN_ML, Props);
+	Props.m_MaxWidth = Community.w;
+	Ui()->DoLabel(&Community, RCLocalize("Community"), EditBoxFontSize, TEXTALIGN_ML, Props);
+	Props.m_MaxWidth = Date.w;
+	Ui()->DoLabel(&Date, RCLocalize("Added"), EditBoxFontSize, TEXTALIGN_ML, Props);
+
+	s_ListBox.SetActive(!s_MapInput.IsActive() && !s_MapperInput.IsActive() && !s_CommunityInput.IsActive());
+	s_ListBox.DoStart(32.0f, static_cast<int>(vMaps.size()), 1, 3, s_SelectedMap, &MainView, true, IGraphics::CORNER_B, true);
+	for(const auto &Map : vMaps)
+	{
+		const CListboxItem Item = s_ListBox.DoNextItem(&Map);
+		if(!Item.m_Visible)
+			continue;
+
+		CUIRect Row = Item.m_Rect;
+		Row.VMargin(4.0f, &Row);
+		Row.VSplitRight(DateWidth, &Row, &Date);
+		Row.VSplitRight(CommunityWidth, &Row, &Community);
+		Row.VSplitRight(MapperWidth, &Name, &Mapper);
+		Name.VMargin(4.0f, &Name);
+		Mapper.VMargin(4.0f, &Mapper);
+		Community.VMargin(4.0f, &Community);
+		Date.VMargin(4.0f, &Date);
+
+		char aTime[32] = "-";
+		if(Map.m_FavoriteTime >= 0)
+			str_timestamp_ex(Map.m_FavoriteTime, aTime, sizeof(aTime), "%Y-%m-%d %H:%M");
+
+		Props.m_MaxWidth = Name.w;
+		Ui()->DoLabel(&Name, Map.m_MapName.c_str(), FontSize, TEXTALIGN_ML, Props);
+		Props.m_MaxWidth = Mapper.w;
+		if(Ui()->DoLabel(&Mapper, Map.m_MapperNickname.empty() ? "-" : Map.m_MapperNickname.c_str(), EditBoxFontSize, TEXTALIGN_ML, Props).m_Truncated && !Map.m_MapperNickname.empty())
+			GameClient()->m_Tooltips.DoToolTip(&Map, &Mapper, Map.m_MapperNickname.c_str());
+		Props.m_MaxWidth = Community.w;
+		Ui()->DoLabel(&Community, Map.m_Community.empty() ? "-" : Map.m_Community.c_str(), EditBoxFontSize, TEXTALIGN_ML, Props);
+		Props.m_MaxWidth = Date.w;
+		Ui()->DoLabel(&Date, aTime, EditBoxFontSize, TEXTALIGN_ML, Props);
+	}
+	s_SelectedMap = s_ListBox.DoEnd();
+	if(vMaps.empty())
+		Ui()->DoLabel(&MainView, RCLocalize("No favorite maps yet"), FontSize, TEXTALIGN_MC);
+
+	Details.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_ALL, 5.0f);
+	Details.Margin(Margin, &Details);
+	const bool HasSelection = s_SelectedMap >= 0 && s_SelectedMap < static_cast<int>(vMaps.size());
+	const auto *pSelectedMap = HasSelection ? &vMaps[s_SelectedMap] : nullptr;
+	CUIRect InfoRow;
+	Props.m_MaxWidth = Details.w;
+	Details.HSplitTop(LineSize, &InfoRow, &Details);
+	str_format(aDetail, sizeof(aDetail), "%s: %s", RCLocalize("MapName"), HasSelection ? pSelectedMap->m_MapName.c_str() : "-");
+	if(Ui()->DoLabel(&InfoRow, aDetail, FontSize, TEXTALIGN_ML, Props).m_Truncated && HasSelection)
+	{
+		Ui()->DoButtonLogic(pSelectedMap->m_MapName.c_str(), 0, &InfoRow, BUTTONFLAG_NONE);
+		GameClient()->m_Tooltips.DoToolTip(pSelectedMap->m_MapName.c_str(), &InfoRow, pSelectedMap->m_MapName.c_str());
+	}
+	Details.HSplitTop(LineSize, &InfoRow, &Details);
+	str_format(aDetail, sizeof(aDetail), "%s: %s", RCLocalize("Mapper"), HasSelection && !pSelectedMap->m_MapperNickname.empty() ? pSelectedMap->m_MapperNickname.c_str() : "-");
+	if(Ui()->DoLabel(&InfoRow, aDetail, FontSize, TEXTALIGN_ML, Props).m_Truncated && HasSelection && !pSelectedMap->m_MapperNickname.empty())
+	{
+		Ui()->DoButtonLogic(pSelectedMap->m_MapperNickname.c_str(), 0, &InfoRow, BUTTONFLAG_NONE);
+		GameClient()->m_Tooltips.DoToolTip(pSelectedMap->m_MapperNickname.c_str(), &InfoRow, pSelectedMap->m_MapperNickname.c_str());
+	}
+	Details.HSplitTop(LineSize, &InfoRow, &Details);
+	str_format(aDetail, sizeof(aDetail), "%s: %s", RCLocalize("Community"), HasSelection && !pSelectedMap->m_Community.empty() ? pSelectedMap->m_Community.c_str() : "-");
+	Ui()->DoLabel(&InfoRow, aDetail, FontSize, TEXTALIGN_ML, Props);
+	Details.HSplitTop(LineSize, &InfoRow, &Details);
+	char aTime[32] = "-";
+	if(HasSelection && pSelectedMap->m_FavoriteTime >= 0)
+		str_timestamp_ex(pSelectedMap->m_FavoriteTime, aTime, sizeof(aTime), "%Y-%m-%d %H:%M");
+	str_format(aDetail, sizeof(aDetail), "%s: %s", RCLocalize("Added"), aTime);
+	Ui()->DoLabel(&InfoRow, aDetail, FontSize, TEXTALIGN_ML, Props);
+
+	static CButtonContainer s_MapButton, s_CopyMapButton, s_CopyMapCommandButton, s_RemoveButton;
+	CUIRect Button;
+	Details.HSplitTop(MarginSmall, nullptr, &Details);
+	Details.HSplitTop(24.0f, &Button, &Details);
+	const bool CanChangeMap = HasSelection && Client()->State() == IClient::STATE_ONLINE;
+	const std::string MapCommand = HasSelection ? "/map " + pSelectedMap->m_MapName : "";
+	if(DoButton_Menu(&s_MapButton, RCLocalize("Switch Map"), CanChangeMap ? 0 : -1, &Button))
+		GameClient()->m_Chat.SendChat(0, MapCommand.c_str(), true);
+	Details.HSplitTop(MarginSmall, nullptr, &Details);
+	Details.HSplitTop(24.0f, &Button, &Details);
+	if(DoButton_Menu(&s_CopyMapButton, RCLocalize("Copy Map"), HasSelection ? 0 : -1, &Button))
+		Input()->SetClipboardText(pSelectedMap->m_MapName.c_str());
+	Details.HSplitTop(MarginSmall, nullptr, &Details);
+	Details.HSplitTop(24.0f, &Button, &Details);
+	if(DoButton_Menu(&s_CopyMapCommandButton, RCLocalize("Copy /map"), HasSelection ? 0 : -1, &Button))
+		Input()->SetClipboardText(MapCommand.c_str());
+	CUIRect RemoveButton;
+	Details.HSplitBottom(24.0f, &Details, &RemoveButton);
+	Details.HSplitBottom(MarginSmall, &Details, nullptr);
+	Details.HSplitBottom(LineSize, nullptr, &Button);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RcShowFavoriteMapIcon, RCLocalize("Show icon in server list"), &g_Config.m_RcShowFavoriteMapIcon, &Button, LineSize);
+	if(DoButton_Menu(&s_RemoveButton, RCLocalize("Remove selected"), HasSelection ? 0 : -1, &RemoveButton))
+	{
+		GameClient()->m_RClient.RemoveFavoriteMapByIndex(s_SelectedMap);
+		s_SelectedMap = -1;
+	}
+
+	CUIRect MapInput, MapperInput, CommunityInput, AddButton;
+	Controls.VSplitRight(80.0f, &Controls, &AddButton);
+	Controls.VSplitRight(MarginSmall, &Controls, nullptr);
+	const float InputWidth = (Controls.w - MarginSmall * 2.0f) / 3.0f;
+	Controls.VSplitLeft(InputWidth, &MapInput, &Controls);
+	Controls.VSplitLeft(MarginSmall, nullptr, &Controls);
+	Controls.VSplitLeft(InputWidth, &MapperInput, &Controls);
+	Controls.VSplitLeft(MarginSmall, nullptr, &CommunityInput);
+	s_MapInput.SetEmptyText(RCLocalize("Map"));
+	s_MapperInput.SetEmptyText(RCLocalize("Mapper"));
+	s_CommunityInput.SetEmptyText(RCLocalize("Community"));
+	Ui()->DoEditBox(&s_MapInput, &MapInput, EditBoxFontSize);
+	Ui()->DoEditBox(&s_MapperInput, &MapperInput, EditBoxFontSize);
+	Ui()->DoEditBox(&s_CommunityInput, &CommunityInput, EditBoxFontSize);
+	static CButtonContainer s_AddButton;
+	const bool CanAdd = *str_utf8_skip_whitespaces(s_MapInput.GetString()) != '\0';
+	if(DoButton_Menu(&s_AddButton, RCLocalize("Add"), CanAdd ? 0 : -1, &AddButton))
+	{
+		GameClient()->m_RClient.AddFavoriteMap(s_MapInput.GetString(), s_MapperInput.GetString(), s_CommunityInput.GetString());
+		s_SelectedMap = static_cast<int>(vMaps.size()) - 1;
+		s_ListBox.ScrollToSelected();
+		s_MapInput.Clear();
+		s_MapperInput.Clear();
+		s_CommunityInput.Clear();
+	}
 }

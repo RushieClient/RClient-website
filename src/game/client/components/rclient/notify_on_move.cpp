@@ -148,14 +148,16 @@ void CNotifyOnMove::OnRender()
 				float T = m_SpecNotifyAnim;
 				float Phase = (T < 0.5f) ? (2.0f * T * T) : (1.0f - std::pow(-2.0f * T + 2.0f, 2) / 2.0f);
 
+				const CUi::CScopedScreenAspect AspectScope(Ui(), g_Config.m_RcCustomAspectDisable & RcAspectDisable::NOTIFYINSPEC);
 				float MHeight = 300.0f;
-				float MWidth = MHeight * (g_Config.m_RcCustomAspectDisable & RcAspectDisable::NOTIFYINSPEC ? Graphics()->ScreenAspectReal() : Graphics()->ScreenAspect());
+				float MWidth = MHeight * Ui()->ScreenAspect();
 				Graphics()->MapScreenToSize(MWidth, MHeight);
 				CUIRect NotifyBox;
 				NotifyBox.w = 60.0f;
 				NotifyBox.h = 12.0f;
-				NotifyBox.x = (MWidth - NotifyBox.w) / 100.0f * g_Config.m_RcTextOnMoveInSpecPosX;
-				NotifyBox.y = (MHeight - NotifyBox.h) / 100.0f * g_Config.m_RcTextOnMoveInSpecPosY;
+				const ivec2 Offset = GameClient()->m_RcHudEditor.GetElementPosition(CHudEditor::ELEM_NOTIFYONMOVE);
+				NotifyBox.x = (MWidth - NotifyBox.w) * 0.5f + Offset.x;
+				NotifyBox.y = (MHeight - NotifyBox.h) * 0.5f + Offset.y;
 				NotifyBox.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.6f * Phase), IGraphics::CORNER_ALL, 5.0f);
 				NotifyBox.Margin(1.0f, &NotifyBox);
 				TextRender()->TextColor(ColorRGBA(1.0f, 0.0f, 0.0f, Phase));

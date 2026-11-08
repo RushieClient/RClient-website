@@ -85,6 +85,7 @@ void CEdgeHelper::OnRender()
 	if(!IsActive())
 		return;
 
+	const CUi::CScopedScreenAspect AspectScope(Ui(), g_Config.m_RcCustomAspectDisable & RcAspectDisable::EDGEINFO);
 	RenderEdgeHelper();
 }
 
@@ -93,12 +94,13 @@ void CEdgeHelper::RenderEdgeHelper()
 	CUIRect Base, EdgeInfo, JumpInfo;
 
 	float MHeight = 300.0f;
-	float MWidth = MHeight * (g_Config.m_RcCustomAspectDisable & RcAspectDisable::EDGEINFO ? Graphics()->ScreenAspectReal() : Graphics()->ScreenAspect());
+	float MWidth = MHeight * Ui()->ScreenAspect();
 
 	Base.h = MHeight / (g_Config.m_RcEdgeInfoJump && g_Config.m_RcEdgeInfoCords ? 6 : 12);
 	Base.w = MWidth / 5;
-	Base.x = (MWidth - Base.w) * (g_Config.m_RcEdgeInfoPosX / 100.0f);
-	Base.y = (MHeight - Base.h) * (g_Config.m_RcEdgeInfoPosY / 100.0f);
+	const ivec2 Offset = GameClient()->m_RcHudEditor.GetElementPosition(CHudEditor::ELEM_EDGEINFO);
+	Base.x = (MWidth - Base.w) * 0.5f + Offset.x;
+	Base.y = (MHeight - Base.h) * 0.75f + Offset.y;
 
 	Graphics()->MapScreenToSize(MWidth, MHeight);
 

@@ -167,6 +167,7 @@ void CChat::Reset()
 
 void CChat::OnRelease()
 {
+	m_RcSearchOpened = false;
 	m_Show = false;
 	if(m_MouseUnlocked)
 	{
@@ -268,6 +269,54 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 {
 	if(m_Mode == MODE_NONE)
 		return false;
+
+	if(g_Config.m_RcChatScroll)
+	{
+		const int TotalLines = GetInitializedLineCount();
+		const int RenderLines = TotalLines - m_VisibleLineCount;
+		if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_MOUSE_WHEEL_UP && TotalLines > m_VisibleLineCount)
+			m_HistoryScrollOffset = std::min(m_HistoryScrollOffset + 1, RenderLines);
+		else if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_MOUSE_WHEEL_DOWN && m_HistoryScrollOffset > 0)
+			--m_HistoryScrollOffset;
+	}
+
+	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_F && Input()->ModifierIsPressed() && g_Config.m_ClShowChat)
+	{
+		m_RcSearchOpened = !m_RcSearchOpened;
+		if(m_RcSearchOpened)
+			FindSearchMatch();
+		else
+			m_HistoryScrollOffset = 0;
+		return true;
+	}
+
+	if(m_RcSearchOpened)
+	{
+		if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
+		{
+			m_RcSearchOpened = false;
+			m_HistoryScrollOffset = 0;
+		}
+		else if(Event.m_Flags & IInput::FLAG_PRESS && (Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER))
+		{
+			FindSearchMatch(Input()->ShiftIsPressed() ? -1 : 1);
+		}
+		else if(Event.m_Flags & IInput::FLAG_PRESS && (Event.m_Key == KEY_UP || Event.m_Key == KEY_DOWN))
+		{
+			FindSearchMatch(Event.m_Key == KEY_DOWN ? -1 : 1);
+		}
+		else
+		{
+			m_Input.ProcessInput(Event);
+			if(m_Input.WasChanged())
+			{
+				m_CompletionUsed = false;
+				m_CompletionChosen = -1;
+				FindSearchMatch();
+			}
+		}
+		return true;
+	}
 
 	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
 	{
@@ -537,16 +586,6 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		}
 	}
 
-	if(g_Config.m_RcChatScroll)
-	{
-		const int TotalLines = GetInitializedLineCount();
-		const int RenderLines = TotalLines - m_VisibleLineCount;
-		if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_MOUSE_WHEEL_UP && TotalLines > m_VisibleLineCount)
-			m_HistoryScrollOffset = std::min(m_HistoryScrollOffset + 1, RenderLines);
-		else if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_MOUSE_WHEEL_DOWN && m_HistoryScrollOffset > 0)
-			--m_HistoryScrollOffset;
-	}
-
 	return true;
 }
 
@@ -570,12 +609,12 @@ void CChat::EnableMode(int Team)
 			   Client()->State() == IClient::STATE_DEMOPLAYBACK) &&
 			g_Config.m_RcChatShowMouse)
 		{
-			const vec2 OldMousePos = Ui()->MousePos();
+			const vec2 OldMousePos = Ui()->UpdatedMousePos();
 
 			m_MouseUnlocked = true;
 			if(m_LastMousePos == std::nullopt)
 			{
-				SetUiMousePos(Ui()->Screen()->Center());
+				SetUiMousePos(vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight()) / 2.0f);
 			}
 			else
 			{
@@ -598,6 +637,7 @@ void CChat::EnableMode(int Team)
 
 void CChat::DisableMode()
 {
+	m_RcSearchOpened = false;
 	if(m_Mode != MODE_NONE)
 	{
 		m_Mode = MODE_NONE;
@@ -609,6 +649,36 @@ void CChat::DisableMode()
 		m_SettingsOpened = false;
 	}
 	m_HistoryScrollOffset = 0;
+}
+
+void CChat::FindSearchMatch(int Direction)
+{
+	const int Count = m_Input.IsEmpty() ? 0 : GetInitializedLineCount();
+	const int Start = Direction == 0 ? 0 : std::min(m_HistoryScrollOffset, Count - 1) + Direction;
+	const int Step = Direction < 0 ? -1 : 1;
+	m_SearchMatchCount = 0;
+	m_HistoryScrollOffset = 0;
+	for(int i = 0; i < Count; ++i)
+	{
+		const int Offset = (Start + i * Step + Count) % Count;
+		const CLine &Line = m_aLines[(m_CurrentLine - Offset + MAX_LINES) % MAX_LINES];
+		if(!MatchesSearch(Line))
+			continue;
+
+		if(m_SearchMatchCount == 0)
+			m_HistoryScrollOffset = Offset;
+		++m_SearchMatchCount;
+	}
+}
+
+bool CChat::MatchesSearch(const CLine &Line) const
+{
+	if(m_Input.IsEmpty())
+		return false;
+
+	const char *pQuery = m_Input.GetString();
+	const CColoredParts ColoredParts(Line.m_aText, Line.m_ClientId == CLIENT_MSG);
+	return str_utf8_find_nocase(Line.m_aName, pQuery) || str_utf8_find_nocase(ColoredParts.Text(), pQuery);
 }
 
 void CChat::OnMessage(int MsgType, void *pRawMsg)
@@ -853,6 +923,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	}
 
 	m_CurrentLine = (m_CurrentLine + 1) % MAX_LINES;
+	if(m_HistoryScrollOffset > 0)
+		m_HistoryScrollOffset = std::min(m_HistoryScrollOffset + 1, MAX_LINES - 1);
 
 	CLine &CurrentLine = m_aLines[m_CurrentLine];
 	CurrentLine.Reset(*this);
@@ -1045,7 +1117,7 @@ void CChat::OnPrepareLines(float y, float x)
 	int64_t Now = time();
 	float LineWidth = (IsScoreBoardOpen ? std::max(85.0f, FontSize * 85.0f / 6.0f) : g_Config.m_ClChatWidth) - (RealMsgPaddingX * 1.5f) - RealMsgPaddingTee;
 
-	float HeightLimit = IsScoreBoardOpen ? 180.0f : (m_PrevShowChat ? 50.0f : 200.0f) + g_Config.m_RcChatPosY;
+	float HeightLimit = IsScoreBoardOpen ? 180.0f : (m_PrevShowChat ? 50.0f : 200.0f) + GameClient()->m_RcHudEditor.GetElementPosition(CHudEditor::ELEM_CHAT).y;
 	float Begin = x;
 	float TextBegin = Begin + RealMsgPaddingX / 2.0f;
 	int OffsetType = IsScoreBoardOpen ? 1 : 0;
@@ -1354,6 +1426,7 @@ void CChat::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
+	const CUi::CScopedScreenAspect AspectScope(Ui(), g_Config.m_RcCustomAspectDisable & RcAspectDisable::CHAT);
 	// send pending chat messages
 	if(m_PendingChatCounter > 0 && m_LastChatSend + time_freq() < time())
 	{
@@ -1370,7 +1443,7 @@ void CChat::OnRender()
 	}
 
 	const float Height = 300.0f;
-	const float Width = Height * (g_Config.m_RcCustomAspectDisable & RcAspectDisable::CHAT ? Graphics()->ScreenAspectReal() : Graphics()->ScreenAspect());
+	const float Width = Height * Ui()->ScreenAspect();
 	if(m_LastRenderWidth != Width)
 	{
 		m_LastRenderWidth = Width;
@@ -1378,10 +1451,11 @@ void CChat::OnRender()
 	}
 	Graphics()->MapScreenToSize(Width, Height);
 
-	float x = 5.0f + g_Config.m_RcChatPosX;
+	const ivec2 ChatOffset = GameClient()->m_RcHudEditor.GetElementPosition(CHudEditor::ELEM_CHAT);
+	float x = 5.0f + ChatOffset.x;
 
 	// TClient
-	float y = Height - (20.0f * FontSize() / 6.0f + (g_Config.m_TcStatusBar ? g_Config.m_TcStatusBarHeight : 0.0f)) + g_Config.m_RcChatPosY;
+	float y = Height - (20.0f * FontSize() / 6.0f + (g_Config.m_TcStatusBar ? g_Config.m_TcStatusBarHeight : 0.0f)) + ChatOffset.y;
 	// float y = 300.0f - 20.0f * FontSize() / 6.0f;
 
 	float ScaledFontSize = FontSize() * (8.0f / 6.0f);
@@ -1396,7 +1470,13 @@ void CChat::OnRender()
 		// TClient
 		InputCursor.m_LineWidth = std::max(Width - 190.0f, 190.0f);
 
-		if(m_Mode == MODE_ALL)
+		if(m_RcSearchOpened)
+		{
+			char aSearchLabel[32];
+			str_format(aSearchLabel, sizeof(aSearchLabel), "%s [%d]", Localize("Search"), m_SearchMatchCount);
+			TextRender()->TextEx(&InputCursor, aSearchLabel);
+		}
+		else if(m_Mode == MODE_ALL)
 			TextRender()->TextEx(&InputCursor, Localize("All"));
 		else if(m_Mode == MODE_TEAM)
 			TextRender()->TextEx(&InputCursor, Localize("Team"));
@@ -1436,7 +1516,7 @@ void CChat::OnRender()
 		m_Input.SetScrollOffsetChange(ScrollOffsetChange);
 
 		// Autocompletion hint
-		if((m_Input.GetString()[0] == '/' || (g_Config.m_RcCommandsFixLayout ? m_Input.GetString()[0] == '.' : false)) && m_Input.GetString()[1] != '\0' && !m_vServerCommands.empty())
+		if(!m_RcSearchOpened && (m_Input.GetString()[0] == '/' || (g_Config.m_RcCommandsFixLayout ? m_Input.GetString()[0] == '.' : false)) && m_Input.GetString()[1] != '\0' && !m_vServerCommands.empty())
 		{
 			const char *pCmdName = g_Config.m_RcCommandsFixLayout ? GameClient()->m_RClient.FixLayoutLine(m_Input.GetString()) + 1 : m_Input.GetString() + 1;
 			for(const auto &Command : m_vServerCommands)
@@ -1461,7 +1541,8 @@ void CChat::OnRender()
 #endif
 		return;
 
-	m_HistoryScrollOffset = g_Config.m_RcChatScroll ? m_HistoryScrollOffset : 0;
+	if(!m_RcSearchOpened && !g_Config.m_RcChatScroll)
+		m_HistoryScrollOffset = 0;
 
 	y -= ScaledFontSize;
 
@@ -1483,7 +1564,7 @@ void CChat::OnRender()
 	bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive() && (Graphics()->ScreenAspect() > 1.7f); // only assume scoreboard when screen ratio is widescreen(something around 16:9)
 
 	int64_t Now = time();
-	float HeightLimit = IsScoreBoardOpen ? 180.0f : (m_PrevShowChat ? 50.0f : 200.0f) + g_Config.m_RcChatPosY;
+	float HeightLimit = IsScoreBoardOpen ? 180.0f : (m_PrevShowChat ? 50.0f : 200.0f) + ChatOffset.y;
 	int OffsetType = IsScoreBoardOpen ? 1 : 0;
 
 	float RealMsgPaddingX = MessagePaddingX();
@@ -1681,6 +1762,8 @@ void CChat::OnRender()
 			Graphics()->TextureClear();
 			if(Line.m_QuadContainerIndex != -1)
 			{
+				Graphics()->SetColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClChatBackgroundColor, true)).WithMultipliedAlpha(Blend));
+
 				if(g_Config.m_RcEnableHighlightChat)
 				{
 					if(GameClient()->m_RClient.IsNeedHighlightPlayer(Line.m_aName))
@@ -1688,10 +1771,10 @@ void CChat::OnRender()
 					else
 						Graphics()->SetColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClChatBackgroundColor, true)).WithMultipliedAlpha(Blend));
 				}
-				else
-				{
-					Graphics()->SetColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClChatBackgroundColor, true)).WithMultipliedAlpha(Blend));
-				}
+
+				if(m_RcSearchOpened && i == m_HistoryScrollOffset && MatchesSearch(Line))
+					Graphics()->SetColor(ColorRGBA(1.0f, 0.8f, 0.2f, 0.35f).WithMultipliedAlpha(Blend));
+
 				Graphics()->RenderQuadContainerEx(Line.m_QuadContainerIndex, 0, -1, 0, ((y + RealMsgPaddingY / 2.0f) - Line.m_TextYOffset));
 			}
 		}
@@ -1918,30 +2001,28 @@ bool CChat::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 }
 void CChat::SetUiMousePos(vec2 Pos)
 {
-	const vec2 WindowSize = vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight());
-	const CUIRect *pScreen = Ui()->Screen();
-
 	const vec2 UpdatedMousePos = Ui()->UpdatedMousePos();
-	Pos = Pos / vec2(pScreen->w, pScreen->h) * WindowSize;
 	Ui()->OnCursorMove(Pos.x - UpdatedMousePos.x, Pos.y - UpdatedMousePos.y);
 }
 void CChat::LockMouse()
 {
+	const vec2 OldMousePos = Ui()->UpdatedMousePos();
 	Ui()->ClosePopupMenus();
 	m_MouseUnlocked = false;
 	if(m_LastMousePos == std::nullopt)
 	{
-		SetUiMousePos(Ui()->Screen()->Center());
+		SetUiMousePos(vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight()) / 2.0f);
 	}
 	else
 	{
 		SetUiMousePos(m_LastMousePos.value());
 	}
-	m_LastMousePos = Ui()->MousePos();
+	m_LastMousePos = OldMousePos;
 }
 
 void CChat::OnReset()
 {
+	m_RcSearchOpened = false;
 	m_MouseUnlocked = false;
 	m_LastMousePos = std::nullopt;
 }

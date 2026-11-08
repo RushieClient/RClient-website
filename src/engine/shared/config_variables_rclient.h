@@ -23,6 +23,7 @@ MACRO_CONFIG_INT(RcDeepFlyOnRMB, rc_deep_fly_on_rmb, 0, 0, 1, CFGFLAG_CLIENT | C
 MACRO_CONFIG_INT(RcUseRushieMasterServerMirrors, rc_use_rushie_master_server_mirrors, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use Rushie master server mirrors")
 MACRO_CONFIG_INT(RcUseBestClientMasterServerMirrors, rc_use_bestclient_master_server_mirrors, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use BestClient master server mirrors")
 MACRO_CONFIG_INT(RcFilterOnlyEmptyServers, rc_filter_only_empty_servers, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use master server mirrors")
+MACRO_CONFIG_INT(RcShowFavoriteMapIcon, rc_show_favorite_map_icon, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show favorite map icons in the server list")
 
 // Chat Filter
 MACRO_CONFIG_INT(RcMessageFilterMode, rc_message_filter_mode, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Message filter mode(0-off,1-partial,2-full,3-both")
@@ -66,16 +67,16 @@ MACRO_CONFIG_COL(RcEdgeInfoColorKill, rc_edge_info_color_kill, 65461, CFGFLAG_CL
 MACRO_CONFIG_COL(RcEdgeInfoColorSafe, rc_edge_info_color_safe, 5594535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Safe color in edge info")
 MACRO_CONFIG_INT(RcEdgeInfoCords, rc_edge_info_cords, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show upper panel of edge info")
 MACRO_CONFIG_INT(RcEdgeInfoJump, rc_edge_info_jump, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show lower panel of edge info")
-MACRO_CONFIG_INT(RcEdgeInfoPosX, rc_edge_info_pos_x, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Change edge info pos x")
-MACRO_CONFIG_INT(RcEdgeInfoPosY, rc_edge_info_pos_y, 75, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Change edge info pos y")
 
 // Hud
 MACRO_CONFIG_INT(RcShowhudPlayerCheckpoint, rc_showhud_player_checkpoint, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show checkpoint in hud")
 MACRO_CONFIG_INT(RcShowhudSmallerHud, rc_showhud_smaller_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "checkpoint and hud will be oneline")
+MACRO_CONFIG_INT(RcShowhudRampSpeedX, rc_showhud_ramp_speed_x, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ramp speed x")
 MACRO_CONFIG_INT(RcShowhudAdvancedDummyActions, rc_showhud_advanced_dummy_actions, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show advanced ingame HUD (Dummy Actions)")
 MACRO_CONFIG_INT(RcShowhudVotingPercent, rc_showhud_voting_percent, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show percent in hud")
 
 // Nameplates
+MACRO_CONFIG_INT(RcNamePlatesVoice, rc_nameplates_voice, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show voice chat headphones in nameplates")
 MACRO_CONFIG_INT(RcNamePlatesHook, rc_nameplates_hook, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show hook detection in name plates (1 = other players', 2 = everyone, 3 = only your own, 4 = your and dummy")
 MACRO_CONFIG_INT(RcNamePlatesHookSize, rc_nameplates_hook_size, 30, -50, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of hook detection icons")
 MACRO_CONFIG_INT(RcNamePlatesHookShiftOnInvis, rc_nameplates_hook_shift_on_invis, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hook when not visible will still take up space")
@@ -118,8 +119,6 @@ MACRO_CONFIG_INT(RcNotifyOnMoveInSpec, rc_notify_on_move_in_spec, 0, 0, 1, CFGFL
 MACRO_CONFIG_INT(RcTextOnMoveInSpec, rc_text_on_move_in_spec, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show text when someone moves u when u spectate")
 MACRO_CONFIG_INT(RcPlayOnMoveInSpec, rc_play_on_move_in_spec, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Play sound when someone moves u when u spectate")
 MACRO_CONFIG_INT(RcSoundOnMoveInSpec, rc_sound_on_move_in_spec, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Choose sound when spectate (0-WakeUp, 1-Grenade boom, 2-msg tag")
-MACRO_CONFIG_INT(RcTextOnMoveInSpecPosX, rc_text_on_move_in_spec_pos_x, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show text when someone moves u when u spectate")
-MACRO_CONFIG_INT(RcTextOnMoveInSpecPosY, rc_text_on_move_in_spec_pos_y, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show text when someone moves u when u spectate")
 MACRO_CONFIG_INT(RcTextOnMoveInSpecRemoveOnInput, rc_text_on_move_in_spec_remove_on_input, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Remove text in spec when any input")
 MACRO_CONFIG_INT(RcSendInMenuInfoWhenInactive, rc_send_in_menu_info_when_inactive, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Remove text in spec when any input")
 
@@ -163,13 +162,12 @@ MACRO_CONFIG_INT(RcSpectatorMoveEnable, rc_spectator_move_enabled, 0, 0, 1, CFGF
 MACRO_CONFIG_INT(RcSpectatorMoveSpeed, rc_spectator_move_speed, 100, 10, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of spectator freeview movement")
 MACRO_CONFIG_INT(RcAdminPanelPlaySounds, rc_admin_panel_play_sounds, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Plays sound when do command")
 MACRO_CONFIG_INT(RcRconAuthOnDummyConnect, rc_rcon_auth_on_dummy_connect, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auth rcon dummy when connect")
+MACRO_CONFIG_INT(RcSpecClosestInSpec, rc_spec_closest_in_spec, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Choose can u spec closest on players in spec or no")
 
 // Above Below player
 MACRO_CONFIG_INT(RcNotifyWhenAbovePosPlayer, rc_notify_when_above_pos_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Appear text that u above player")
 MACRO_CONFIG_INT(RcNotifyWhenSamePosPlayer, rc_notify_when_same_pos_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Appear text that u same pos player")
 MACRO_CONFIG_INT(RcNotifyWhenBelowPosPlayer, rc_notify_when_below_pos_player, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Appear text that u below player")
-MACRO_CONFIG_INT(RcNotifyWhenPosPlayerPosX, rc_notify_when_pos_player_pos_x, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Appear text when u above/same/below pos player")
-MACRO_CONFIG_INT(RcNotifyWhenPosPlayerPosY, rc_notify_when_pos_player_pos_y, 75, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Appear text when u above/same/below pos player")
 
 // Helping features
 MACRO_CONFIG_INT(RcAutoLockTeam, rc_auto_lock_team, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto lock team when join(1-Empty, 2-Any)")
@@ -183,7 +181,6 @@ MACRO_CONFIG_INT(RcSpectatorSortId, rc_spectator_sort_id, 0, 0, 2, CFGFLAG_CLIEN
 //Swap Timer
 MACRO_CONFIG_INT(RcEnableSwapTimer, rc_enable_swap_timer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable swap timer")
 MACRO_CONFIG_INT(RcEnableSwapTimerOnLeftSide, rc_enable_swap_timer_on_left_side, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer on left side")
-MACRO_CONFIG_INT(RcEnableSwapTimerPosY, rc_enable_swap_timer_pos_y, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer y")
 
 // Recharge Bars
 MACRO_CONFIG_INT(RcShowRechargeBars, rc_show_recharge_bars, 0, 0, 1, CFGFLAG_SAVE | CFGFLAG_CLIENT, "Show weapon cooldown bars")
@@ -213,31 +210,6 @@ MACRO_CONFIG_INT(RcEnableHighlightChat, rc_enable_highlight_chat, 1, 0, 1, CFGFL
 // Weapon Slots
 MACRO_CONFIG_INT(RcWeaponSlots, rc_weapon_slots, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Slots for weapons")
 
-// Hud Editor
-MACRO_CONFIG_INT(RcHudTimerPosX, rc_hud_timer_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer X offset in HUD units from center")
-MACRO_CONFIG_INT(RcHudTimerPosY, rc_hud_timer_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer Y position in HUD units from top")
-MACRO_CONFIG_INT(RcHudSpectatorCountPosX, rc_hud_spectator_count_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer X offset in HUD units from center")
-MACRO_CONFIG_INT(RcHudSpectatorCountPosY, rc_hud_spectator_count_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer Y position in HUD units from top")
-MACRO_CONFIG_INT(RcHudDummyActionsPosX, rc_hud_dummy_actions_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer X offset in HUD units from center")
-MACRO_CONFIG_INT(RcHudDummyActionsPosY, rc_hud_dummy_actions_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer Y position in HUD units from top")
-MACRO_CONFIG_INT(RcHudPlayerMovementPosX, rc_hud_player_movement_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer X offset in HUD units from center")
-MACRO_CONFIG_INT(RcHudPlayerMovementPosY, rc_hud_player_movement_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Game timer Y position in HUD units from top")
-MACRO_CONFIG_INT(RcHudPlayerStatePosX, rc_hud_player_state_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state X offset in HUD units from left")
-MACRO_CONFIG_INT(RcHudPlayerStatePosY, rc_hud_player_state_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state Y offset in HUD units from top")
-MACRO_CONFIG_INT(RcHudFrozenHudPosX, rc_hud_frozen_hud_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state X offset in HUD units from left")
-MACRO_CONFIG_INT(RcHudFrozenHudPosY, rc_hud_frozen_hud_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state Y offset in HUD units from top")
-MACRO_CONFIG_INT(RcHudFrozenTextPosX, rc_hud_frozen_text_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state X offset in HUD units from left")
-MACRO_CONFIG_INT(RcHudFrozenTextPosY, rc_hud_frozen_text_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state Y offset in HUD units from top")
-MACRO_CONFIG_INT(RcHudFpsTextPosX, rc_hud_fps_text_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state X offset in HUD units from left")
-MACRO_CONFIG_INT(RcHudFpsTextPosY, rc_hud_fps_text_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state Y offset in HUD units from top")
-MACRO_CONFIG_INT(RcHudLastTextPosX, rc_hud_last_text_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state X offset in HUD units from left")
-MACRO_CONFIG_INT(RcHudLastTextPosY, rc_hud_last_text_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player state Y offset in HUD units from top")
-MACRO_CONFIG_INT(RcChatPosX, rc_chat_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat X position in HUD units from left")
-MACRO_CONFIG_INT(RcChatPosY, rc_chat_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat Y offset in HUD units from bottom")
-
-// Entities
-MACRO_CONFIG_INT(RcHookthroughAlpha, rc_hookthrough_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Opacity of hookthrough walls in entities (0 invisible, 100 fully visible)")
-
 // Hook Coll
 MACRO_CONFIG_INT(RcContinueHookLine, rc_continue_hook_line, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Continue hookline after hit")
 MACRO_CONFIG_COL(RcHookLineContinueColor, rc_hook_line_continue_color, 4278190080, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Specifies the color of the hookline tip")
@@ -246,3 +218,42 @@ MACRO_CONFIG_COL(RcHookLinePlayerContinueColor, rc_hook_line_player_continue_col
 
 // SendPos
 MACRO_CONFIG_INT(RcSendSpecPlPos, rc_send_spec_pl_pos, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Send player in spec pos")
+
+// Voice chat
+MACRO_CONFIG_STR(RcVoiceTokenUrl, rc_voice_token_url, 256, "https://voice.rushie.qzz.io/token", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice server token endpoint URL")
+MACRO_CONFIG_INT(RcVoiceRoomMode, rc_voice_room_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice room mode (0 - one room per server, 1 - custom room on server)")
+MACRO_CONFIG_STR(RcVoiceRoomName, rc_voice_room_name, 64, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Custom voice room name")
+MACRO_CONFIG_INT(RcVoiceAutoConnect, rc_voice_auto_connect, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto join voice chat on server connect")
+MACRO_CONFIG_STR(RcVoiceMicDevice, rc_voice_mic_device, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Microphone device id (empty = system default)")
+MACRO_CONFIG_STR(RcVoicePlayoutDevice, rc_voice_playout_device, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speaker device id (empty = system default)")
+MACRO_CONFIG_INT(RcVoiceDebugHud, rc_voice_debug_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show voice chat debug HUD")
+MACRO_CONFIG_INT(RcVoiceIndicator, rc_voice_indicator, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show microphone and headphones voice indicator")
+MACRO_CONFIG_INT(RcVoiceStatus, rc_voice_show_status, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show voice connection status and ping next to the voice indicator")
+MACRO_CONFIG_INT(RcVoiceOverlay, rc_voice_overlay, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show voice participants on the left side of the screen")
+MACRO_CONFIG_INT(RcVoiceOverlayMode, rc_voice_overlay_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice overlay: 0 - speaking participants, 1 - connected participants")
+MACRO_CONFIG_INT(RcVoiceOverlayMuted, rc_voice_overlay_muted, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Include muted participants in the voice overlay and color them red")
+MACRO_CONFIG_INT(RcVoiceOverlaySkin, rc_voice_overlay_skin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player skins in the voice overlay")
+MACRO_CONFIG_INT(RcVoiceOverlayDirection, rc_voice_overlay_direction, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show direction to voice participants, or a circle when their position is unavailable")
+MACRO_CONFIG_COL(RcVoiceOverlayBackgroundColor, rc_voice_overlay_background_color, 0x66000000, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Background color of voice overlay rows")
+MACRO_CONFIG_INT(RcVoiceOverlaySharedBackground, rc_voice_overlay_shared_background, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice overlay background: 0 - separate per player, 1 - one shared panel")
+MACRO_CONFIG_INT(RcVoiceDeafened, rc_voice_deafened, 0, 0, 1, CFGFLAG_CLIENT, "Temporarily mute all incoming voice without changing volume or player settings")
+MACRO_CONFIG_INT(RcVoiceVolume, rc_voice_volume, 100, 0, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice playback volume (%)")
+MACRO_CONFIG_INT(RcVoiceMicVolume, rc_voice_mic_volume, 100, 0, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Microphone volume after voice processing (%)")
+MACRO_CONFIG_INT(RcVoicePttReleaseDelay, rc_voice_ptt_release_delay, 200, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Continue transmitting for this many milliseconds after releasing PTT")
+MACRO_CONFIG_INT(RcVoiceStereoWidth, rc_voice_stereo_width, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice stereo width (%, 0 = centered)")
+MACRO_CONFIG_INT(RcVoiceStereoRadius, rc_voice_stereo_radius, 25, 1, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Horizontal distance for full voice pan at 100% stereo width (tiles)")
+MACRO_CONFIG_INT(RcVoiceStereo, rc_voice_stereo, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Pan voice between left and right channels using player positions")
+MACRO_CONFIG_INT(RcVoiceMinVolume, rc_voice_min_volume, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice volume after distance fading (%)")
+MACRO_CONFIG_INT(RcVoiceMinRadius, rc_voice_min_radius, 10, 0, 199, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep full voice volume up to this distance, then begin fading (tiles)")
+MACRO_CONFIG_INT(RcVoiceRadius, rc_voice_radius, 50, 1, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Distance where voice reaches and stays at minimum volume (tiles)")
+MACRO_CONFIG_INT(RcVoiceSpatial, rc_voice_spatial, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fade voice from full to minimum volume between the configured distances")
+MACRO_CONFIG_INT(RcVoiceListenerMode, rc_voice_listener_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice listener (0 - character, 1 - camera)")
+MACRO_CONFIG_INT(RcVoiceUnpositionedVolume, rc_voice_unpositioned_volume, 50, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice volume for players without a position (%, 0 - mute)")
+MACRO_CONFIG_INT(RcVoiceSpectatorVolume, rc_voice_spectator_volume, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice volume for spectators without a character (%, 0 - mute)")
+MACRO_CONFIG_INT(RcVoiceMuted, rc_voice_muted, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fully mute the voice microphone (push to talk disabled too)")
+MACRO_CONFIG_INT(RcVoiceOtherTeamVolume, rc_voice_other_team_volume, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice volume for other DDNet teams, including team 0 (%, 0 - mute)")
+MACRO_CONFIG_INT(RcVoiceSuperVolume, rc_voice_super_volume, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Voice volume for TEAM_SUPER players (%, 0 - mute)")
+
+// Entities
+MACRO_CONFIG_INT(RcHookthroughAlpha, rc_hookthrough_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Opacity of hookthrough walls in entities (0 invisible, 100 fully visible)")
+
