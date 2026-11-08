@@ -236,7 +236,7 @@ MACRO_CONFIG_INT(RcChatPosX, rc_chat_pos_x, 0, -600, 600, CFGFLAG_CLIENT | CFGFL
 MACRO_CONFIG_INT(RcChatPosY, rc_chat_pos_y, 0, -600, 600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat Y offset in HUD units from bottom")
 
 // Entities
-MACRO_CONFIG_INT(RcHookthroughAlpha, rc_hookthrough_alpha, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Opacity of hookthrough walls in entities (0 invisible, 100 fully visible)")
+MACRO_CONFIG_INT(RcHookthroughAlpha, rc_hookthrough_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Opacity of hookthrough walls in entities (0 invisible, 100 fully visible)")
 
 // Hook Coll
 MACRO_CONFIG_INT(RcContinueHookLine, rc_continue_hook_line, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Continue hookline after hit")
