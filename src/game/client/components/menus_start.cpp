@@ -63,7 +63,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	}
 
 #if defined(CONF_PLATFORM_EMSCRIPTEN)
-	Menu.HSplitBottom(55.0f, &Menu, nullptr);
+	Menu.HSplitBottom(145.0f, &Menu, nullptr);
 	Menu.HSplitBottom(40.0f, &Menu, &Button);
 	static CButtonContainer s_DownloadClientButton;
 	if(GameClient()->m_Menus.DoButton_Menu(&s_DownloadClientButton, Localize("Download"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, Rounding, 0.5f, ColorRGBA(0.0f, 0.4f, 0.55f, 0.4f)))
@@ -75,7 +75,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	}
 	Menu.HSplitBottom(5.0f, &Menu, nullptr); // little space
 #else
-	Menu.HSplitBottom(100.0f, &Menu, nullptr);
+	Menu.HSplitBottom(190.0f, &Menu, nullptr);
 #endif
 	Menu.HSplitBottom(40.0f, &Menu, &Button);
 	static CButtonContainer s_SettingsButton;
