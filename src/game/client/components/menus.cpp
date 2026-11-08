@@ -770,6 +770,7 @@ void CMenus::RenderLoadingDirect(const char *pCaption, const char *pContent, std
 	// need up date this here to get correct
 	ms_GuiColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_UiColor, true));
 
+	const CUi::CScopedScreenAspect AspectScope(Ui(), g_Config.m_RcCustomAspectDisable & (RcAspectDisable::ALL | RcAspectDisable::MENUS));
 	Ui()->MapScreen();
 
 	if(GameClient()->m_MenuBackground.IsLoading())
@@ -2491,8 +2492,7 @@ void CMenus::OnRender()
 		}
 	}
 
-	Ui()->m_RcForceRealAspect = g_Config.m_RcCustomAspectDisable & RcAspectDisable::MENUS;
-
+	const CUi::CScopedScreenAspect AspectScope(Ui(), g_Config.m_RcCustomAspectDisable & (RcAspectDisable::ALL | RcAspectDisable::MENUS));
 	Ui()->StartCheck();
 	UpdateColors();
 
@@ -2518,8 +2518,6 @@ void CMenus::OnRender()
 
 	Ui()->FinishCheck();
 	Ui()->ClearHotkeys();
-
-	Ui()->m_RcForceRealAspect = false;
 }
 
 void CMenus::UpdateColors()

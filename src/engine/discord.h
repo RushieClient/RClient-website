@@ -16,7 +16,7 @@ public:
 	virtual void ClearGameInfo() = 0;
 	virtual void SetGameInfo(const CServerInfo &ServerInfo, bool Registered) = 0;
 	virtual void UpdateServerInfo(const CServerInfo &ServerInfo) = 0;
-	virtual void UpdatePlayerCount(int Count) = 0;
+	virtual void UpdatePlayerCount(int Count, int Team, int TeamPlayers, int MaxTeamPlayers) = 0;
 };
 
 IDiscord *CreateDiscord();

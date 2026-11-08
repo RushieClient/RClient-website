@@ -157,7 +157,7 @@ option(DOWNLOAD_GTEST "Download and compile GTest" ${AUTO_DEPENDENCIES_DEFAULT})
 option(STEAM "Build the Steam release version" ON)
 option(DISCORD "Enable Discord rich presence support" OFF)
 option(DISCORD_DYNAMIC "Enable discovering Discord rich presence libraries at runtime (Linux only)" OFF)
-option(LIVEKIT "Enable LiveKit voice chat support" ON)
+option(LIVEKIT "Enable LiveKit voice chat support (force-disabled in Debug builds)" ON)
 option(PREFER_BUNDLED_LIBS "Prefer bundled libraries over system libraries" ${AUTO_DEPENDENCIES_DEFAULT})
 option(DEV "Don't generate stuff necessary for packaging, don't strip absolute paths from debug info, enable additional assertions" OFF)
 option(VULKAN "Enable the vulkan backend" ${AUTO_VULKAN_BACKEND})
@@ -656,6 +656,12 @@ if(DISCORD)
 endif()
 if(LIVEKIT AND TARGET_OS MATCHES "^(android|ios|emscripten)$")
   set(LIVEKIT OFF) # no livekit binaries for these platforms in rushie-libs
+endif()
+if(LIVEKIT AND MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # livekit.dll links the release CRT, Debug builds use /MTd. The debug CRT changes
+  # std::string/std::vector layout and Room::connect() takes them by value.
+  message(STATUS "Voice chat (LiveKit) disabled in Debug builds, use Release or RelWithDebInfo")
+  set(LIVEKIT OFF)
 endif()
 if(LIVEKIT)
   find_package(Livekit)
@@ -1856,6 +1862,7 @@ set(EXPECTED_DATA
   particles.png
   race_flag.png
   rclient/audio/nonactive_wakeup.wv
+  rclient/gui_logo.png
   rclient/icons/ascendclient_size.png
   rclient/icons/bc_icon.png
   rclient/icons/chillerbotux_size.png
@@ -2925,6 +2932,7 @@ if(CLIENT)
     components/rclient/edgehelper.cpp
     components/rclient/edgehelper.h
     components/rclient/external/ddnet-custom-clients/custom_clients_ids.h
+    components/rclient/external/miniaudio.h
     components/rclient/hud_editor.cpp
     components/rclient/hud_editor.h
     components/rclient/last_saves.cpp
@@ -2941,6 +2949,10 @@ if(CLIENT)
     components/rclient/specwheel.h
     components/rclient/swaptimer.cpp
     components/rclient/swaptimer.h
+    components/rclient/voice/voice_audio.cpp
+    components/rclient/voice/voice_chat.cpp
+    components/rclient/voice/voice_chat.h
+    components/rclient/voice/voice_chat_logic.h
     components/scoreboard.cpp
     components/scoreboard.h
     components/skins.cpp
@@ -3342,6 +3354,10 @@ if(CLIENT)
 
   if(VULKAN)
     target_compile_definitions(game-client PRIVATE CONF_BACKEND_VULKAN)
+  endif()
+
+  if(LIVEKIT)
+    target_compile_definitions(game-client PRIVATE CONF_LIVEKIT)
   endif()
 
   list(APPEND TARGETS_OWN game-client)
@@ -3775,6 +3791,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     unix_test.cpp
     uuid_test.cpp
     vmath_test.cpp
+    voice_chat_test.cpp
     windows_test.cpp
     # tidy-alphabetical-end
   )

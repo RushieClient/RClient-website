@@ -524,7 +524,6 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 		}
 	};
 
-	const int BacklogPrevLine = m_BacklogCurLine;
 	if(Event.m_Flags & IInput::FLAG_PRESS)
 	{
 		if(Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER)
@@ -687,7 +686,6 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 		else if(Event.m_Key == KEY_HOME && m_Input.IsEmpty())
 		{
 			m_BacklogCurLine += GetLinesToScroll(-1, -1);
-			m_BacklogLastActiveLine = m_BacklogCurLine;
 			Handled = true;
 		}
 		else if(Event.m_Key == KEY_END && m_Input.IsEmpty())
@@ -705,11 +703,6 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 			SetSearching(true);
 			Handled = true;
 		}
-	}
-
-	if(m_BacklogCurLine != BacklogPrevLine)
-	{
-		m_HasSelection = false;
 	}
 
 	if(!Handled)
@@ -1169,10 +1162,9 @@ bool CGameConsole::DoButton(const CUIRect &Rect, const char *pIcon, vec2 MousePo
 
 void CGameConsole::OnRender()
 {
-	Ui()->m_RcForceRealAspect = g_Config.m_RcCustomAspectDisable & RcAspectDisable::CONSOLE;
+	const CUi::CScopedScreenAspect AspectScope(Ui(), g_Config.m_RcCustomAspectDisable & (RcAspectDisable::ALL | RcAspectDisable::CONSOLE));
 	CUIRect Screen = *Ui()->Screen();
 	CInstance *pConsole = CurrentConsole();
-	Ui()->m_RcForceRealAspect = false;
 
 	const float MaxConsoleHeight = Screen.h * 3 / 5.0f;
 	float Progress = (Client()->GlobalTime() - (m_StateChangeEnd - m_StateChangeDuration)) / m_StateChangeDuration;
@@ -1217,7 +1209,6 @@ void CGameConsole::OnRender()
 	const ColorRGBA aBackgroundColors[NUM_CONSOLETYPES] = {ColorRGBA(0.2f, 0.2f, 0.2f, 0.9f), ColorRGBA(0.4f, 0.2f, 0.2f, 0.9f)};
 	const ColorRGBA aBorderColors[NUM_CONSOLETYPES] = {ColorRGBA(0.1f, 0.1f, 0.1f, 0.9f), ColorRGBA(0.2f, 0.1f, 0.1f, 0.9f)};
 
-	Ui()->m_RcForceRealAspect = g_Config.m_RcCustomAspectDisable & RcAspectDisable::CONSOLE;
 	Ui()->MapScreen();
 
 	// background
@@ -1296,7 +1287,7 @@ void CGameConsole::OnRender()
 		{
 			pConsole->m_MouseIsPress = false;
 			ButtonReleased = m_ButtonPressed;
-			if(m_ConsoleState == CONSOLE_OPEN && pConsole->m_MousePress.y > ConsoleHeight + 1.0f && pConsole->m_MouseRelease.y > ConsoleHeight + 1.0f) // for border
+			if(m_ConsoleState == CONSOLE_OPEN && m_ButtonPressPosition.y > ConsoleHeight + 1.0f && pConsole->m_MouseRelease.y > ConsoleHeight + 1.0f) // for border
 				Toggle(m_ConsoleType);
 		}
 		if(pConsole->m_MouseIsPress)
@@ -1330,14 +1321,13 @@ void CGameConsole::OnRender()
 					pConsole->m_BacklogCurLine = 0;
 				m_TouchState.m_ScrollAmount.y += ScaledLineHeight;
 			}
-			pConsole->m_HasSelection = false;
 		}
 
 		x = PromptCursor.m_X;
 
 		if(m_ConsoleState == CONSOLE_OPEN && !m_ButtonPressed)
 		{
-			if(pConsole->m_MousePress.y >= pConsole->m_BoundingBox.m_Y && pConsole->m_MousePress.y < pConsole->m_BoundingBox.m_Y + pConsole->m_BoundingBox.m_H)
+			if(m_ButtonPressPosition.y >= pConsole->m_BoundingBox.m_Y && m_ButtonPressPosition.y < pConsole->m_BoundingBox.m_Y + pConsole->m_BoundingBox.m_H)
 			{
 				CLineInput::SMouseSelection *pMouseSelection = pConsole->m_Input.GetMouseSelection();
 				if(pMouseSelection->m_Selecting && !pConsole->m_MouseIsPress && pConsole->m_Input.IsActive())
@@ -1509,6 +1499,16 @@ void CGameConsole::OnRender()
 			Handle.Draw(Handle.Inside(GetMousePosition()) || ScrollbarActive ? ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f) : ColorRGBA(0.8f, 0.8f, 0.8f, 1.0f), IGraphics::CORNER_ALL, Handle.w / 2.0f);
 		}
 
+		if(!ScrollbarActive && !m_ButtonPressed && m_ButtonPressPosition.y < pConsole->m_BoundingBox.m_Y && (pConsole->m_HasSelection || pConsole->m_MouseIsPress))
+		{
+			// Keep the selection anchored to the text when scrolling the backlog.
+			const float SelectionOffset = (pConsole->m_BacklogCurLine - pConsole->m_BacklogLastActiveLine) * LineHeight;
+			pConsole->m_MousePress.y += SelectionOffset;
+			if(!pConsole->m_MouseIsPress)
+				pConsole->m_MouseRelease.y += SelectionOffset;
+		}
+		pConsole->m_BacklogLastActiveLine = pConsole->m_BacklogCurLine;
+
 		int LineNum = -1;
 		pConsole->m_LinesRendered = 0;
 
@@ -1566,7 +1566,7 @@ void CGameConsole::OnRender()
 			EntryCursor.m_LineWidth = Screen.w - 10.0f - ScrollBar::SCROLLBAR_WIDTH - ScrollBar::SCROLLBAR_MARGIN;
 			EntryCursor.m_MaxLines = pEntry->m_LineCount;
 			EntryCursor.m_LineSpacing = LINE_SPACING;
-			EntryCursor.m_CalculateSelectionMode = (m_ConsoleState == CONSOLE_OPEN && !ScrollbarActive && !m_ButtonPressed && pConsole->m_MousePress.y < pConsole->m_BoundingBox.m_Y && (pConsole->m_MouseIsPress || (pConsole->m_CurSelStart != pConsole->m_CurSelEnd) || pConsole->m_HasSelection)) ? TEXT_CURSOR_SELECTION_MODE_CALCULATE : TEXT_CURSOR_SELECTION_MODE_NONE;
+			EntryCursor.m_CalculateSelectionMode = (m_ConsoleState == CONSOLE_OPEN && !ScrollbarActive && !m_ButtonPressed && m_ButtonPressPosition.y < pConsole->m_BoundingBox.m_Y && (pConsole->m_MouseIsPress || (pConsole->m_CurSelStart != pConsole->m_CurSelEnd) || pConsole->m_HasSelection)) ? TEXT_CURSOR_SELECTION_MODE_CALCULATE : TEXT_CURSOR_SELECTION_MODE_NONE;
 			EntryCursor.m_PressMouse = pConsole->m_MousePress;
 			EntryCursor.m_ReleaseMouse = pConsole->m_MouseRelease;
 
@@ -1650,8 +1650,6 @@ void CGameConsole::OnRender()
 
 		Graphics()->ClipDisable();
 
-		pConsole->m_BacklogLastActiveLine = pConsole->m_BacklogCurLine;
-
 		if(m_WantsSelectionCopy && !SelectionString.empty())
 		{
 			pConsole->m_HasSelection = false;
@@ -1694,8 +1692,6 @@ void CGameConsole::OnRender()
 		const char *pClientVersion = CLIENT_NAME " " CLIENT_RELEASE_VERSION;
 		TextRender()->Text(ButtonBar.x + ButtonBar.w - TextRender()->TextWidth(FONT_SIZE, pClientVersion) - 10.0f, FONT_SIZE / 2.0f + FONT_SIZE * 1.5f, FONT_SIZE, pClientVersion);
 	}
-
-	Ui()->m_RcForceRealAspect = false;
 }
 
 void CGameConsole::OnMessage(int MsgType, void *pRawMsg)
@@ -1794,14 +1790,12 @@ void CGameConsole::ConConsolePageUp(IConsole::IResult *pResult, void *pUserData)
 {
 	CInstance *pConsole = ((CGameConsole *)pUserData)->CurrentConsole();
 	pConsole->m_BacklogCurLine += pConsole->GetLinesToScroll(-1, pConsole->m_LinesRendered);
-	pConsole->m_HasSelection = false;
 }
 
 void CGameConsole::ConConsolePageDown(IConsole::IResult *pResult, void *pUserData)
 {
 	CInstance *pConsole = ((CGameConsole *)pUserData)->CurrentConsole();
 	pConsole->m_BacklogCurLine -= pConsole->GetLinesToScroll(1, pConsole->m_LinesRendered);
-	pConsole->m_HasSelection = false;
 	if(pConsole->m_BacklogCurLine < 0)
 		pConsole->m_BacklogCurLine = 0;
 }
@@ -1810,14 +1804,12 @@ void CGameConsole::ConConsolePageTop(IConsole::IResult *pResult, void *pUserData
 {
 	CInstance *pConsole = ((CGameConsole *)pUserData)->CurrentConsole();
 	pConsole->m_BacklogCurLine += pConsole->GetLinesToScroll(-1, pConsole->m_LinesRendered);
-	pConsole->m_HasSelection = false;
 }
 
 void CGameConsole::ConConsolePageBottom(IConsole::IResult *pResult, void *pUserData)
 {
 	CInstance *pConsole = ((CGameConsole *)pUserData)->CurrentConsole();
 	pConsole->m_BacklogCurLine = 0;
-	pConsole->m_HasSelection = false;
 }
 
 void CGameConsole::ConchainConsoleOutputLevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)

@@ -298,8 +298,10 @@ protected:
 class CRenderLayerEntityGame final : public CRenderLayerEntityBase
 {
 public:
-	CRenderLayerEntityGame(int GroupId, int LayerId, int Flags, CMapItemLayerTilemap *pLayerTilemap);
+	CRenderLayerEntityGame(int GroupId, int LayerId, int Flags, CMapItemLayerTilemap *pLayerTilemap, const CMapItemLayerTilemap *pFrontLayer);
 	void Init() override;
+	void Render(const CRenderLayerParams &Params) override;
+	void Unload() override;
 
 protected:
 	void RenderTileLayerWithTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params) override;
@@ -307,6 +309,12 @@ protected:
 
 private:
 	ColorRGBA GetDeathBorderColor() const;
+	void RebuildTileData();
+	void GetTileData(unsigned char *pIndex, unsigned char *pFlags, int *pAngleRotate, unsigned int x, unsigned int y, int CurOverlay) const override;
+	const CMapItemLayerTilemap *m_pFrontLayer;
+	bool m_HookthroughEnabled = false;
+	std::vector<uint8_t> m_vHookthroughMask;
+	std::optional<CTileLayerVisuals> m_VisualHookthrough;
 };
 
 class CRenderLayerEntityFront final : public CRenderLayerEntityBase

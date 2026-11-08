@@ -891,12 +891,16 @@ private:
 	void RenderTeeCute(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, int Emote, vec2 Dir, vec2 Pos, bool CuteEyes, float Alpha = 1.0f);
 
 	// RClient: found in menus_rclient.cpp
+	bool m_VoiceUsersPage = false;
+	bool m_FavoritesMapsPage = false;
 	void RenderSettingsRClient(CUIRect MainView);
+	void RenderSettingsRClientVoiceUsers(CUIRect MainView);
 	void RenderSettingsRClientSettings(CUIRect MainView);
 	void RenderSettingsRClientRcon(CUIRect MainView);
 	void RenderSettingsRClientChatBinds(CUIRect MainView);
 	void RenderSettingsRClientInfo(CUIRect MainView);
 	void RenderSettingsRClientSpecWheel(CUIRect MainView);
+	void RenderSettingsRClientFavoritesMaps(CUIRect MainView);
 
 	// TClient
 	const CWarType *m_pRemoveWarType = nullptr;

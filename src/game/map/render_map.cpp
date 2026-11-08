@@ -591,7 +591,7 @@ void CRenderMap::RenderTile(int x, int y, unsigned char Index, float Scale, Colo
 	Graphics()->MapScreen(ScreenRect);
 }
 
-void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRGBA Color, int RenderFlags)
+void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRGBA Color, int RenderFlags, const uint8_t *pTileMask, bool RenderMasked)
 {
 	CScreenRect ScreenRect = Graphics()->GetScreen();
 
@@ -648,6 +648,8 @@ void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRG
 			int c = mx + my * w;
 
 			unsigned char Index = pTiles[c].m_Index;
+			if(pTileMask && (pTileMask[c] != 0) != RenderMasked)
+				Index = TILE_AIR;
 			if(Index)
 			{
 				unsigned char Flags = pTiles[c].m_Flags;
