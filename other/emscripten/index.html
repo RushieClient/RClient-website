@@ -77,7 +77,10 @@
 			outline-offset: 6px;
 		}
 		#controls {
-			background: inherit;
+			background:
+				radial-gradient(ellipse at center, #000000cc 0%, #00151dcc 55%, #003140cc 100%),
+				url('map-background.png') center / cover no-repeat,
+				#00151d;
 			position: fixed; inset: 0; z-index: 2; display: grid; place-items: center;
 			padding: 40px 24px; overflow: auto; cursor: pointer; transition: opacity 300ms;
 		}

@@ -82,6 +82,7 @@ jobs:
               'index.html', 'favicon.ico', 'favicon.svg', 'rclient-logo.svg', 'platforms.svg',
               'apple-touch-icon.png', 'icon-192.png', 'icon-512.png',
               'manifest.webmanifest', 'og-image.png',
+              'map-background.png',
               'Inter_24pt-Regular.ttf', 'Inter_24pt-SemiBold.ttf',
               'coi-serviceworker.js', 'local_server.js', 'local_server_worker.js',
               'DDNet.js', 'DDNet.wasm', 'DDNet.data',
