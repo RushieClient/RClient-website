@@ -3,16 +3,19 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<meta name="description" content="Try RClient (RushieClient) in your browser or download the custom DDNet client for Windows, Linux, macOS and Android. Choose RClient or RClient Extra.">
-		<title>RClient — Download the DDNet Client &amp; Try in Browser</title>
+		<meta name="description" content="RClient (Rushie Client) is a custom DDNet client based on Tater Client, with additional features and customization. Available for Windows, Linux, macOS and Android.">
+		<meta name="keywords" content="RClient, Rushie Client, RushieClient, Rushie, DDNet, DDRaceNetwork, DDRace, RClient Extra">
+		<title>RClient - Custom DDNet Client</title>
+		<link rel="canonical" href="https://rushie-client.ru/">
 		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://rushie-client.ru/">
 		<meta property="og:site_name" content="RClient">
-		<meta property="og:title" content="RClient — DDNet Client &amp; Browser Demo">
-		<meta property="og:description" content="Download RClient for Windows, Linux, macOS and Android, explore RClient Extra, or try the DDNet Tutorial in your browser.">
+		<meta property="og:title" content="RClient - Custom DDNet Client">
+		<meta property="og:description" content="RClient (Rushie Client) is a custom DDNet client based on Tater Client, with additional features and customization. Available for Windows, Linux, macOS and Android.">
 		<meta name="twitter:card" content="summary">
-		<meta name="twitter:title" content="RClient — DDNet Client &amp; Browser Demo">
-		<meta name="twitter:description" content="Download RClient for Windows, Linux, macOS and Android, explore RClient Extra, or try the DDNet Tutorial in your browser.">
-		<link rel="icon" type="image/x-icon" href="DDNet.ico">
+		<meta name="twitter:title" content="RClient - Custom DDNet Client">
+		<meta name="twitter:description" content="RClient (Rushie Client) is a custom DDNet client based on Tater Client, with additional features and customization. Available for Windows, Linux, macOS and Android.">
+		<link rel="icon" type="image/svg+xml" href="favicon.svg" sizes="any">
 		<style>
 		@font-face {
 			font-family: 'Inter';
@@ -135,6 +138,77 @@
 			border-color: #ffffff24;
 			background: #040607;
 		}
+		#about-button {
+			position: absolute;
+			right: max(32px, env(safe-area-inset-right));
+			bottom: max(32px, env(safe-area-inset-bottom));
+			pointer-events: auto;
+			height: 40px;
+			width: 88px;
+			padding: 0 16px;
+			border: 1px solid #ffffff0d;
+			border-radius: 12px;
+			background: #00000066;
+			color: #9aa7ad;
+			font-size: 13px;
+			font-weight: 600;
+			letter-spacing: 0.02em;
+			transition: color 180ms, border-color 180ms, background-color 180ms;
+		}
+		#about-button:hover, #about-button:focus-visible {
+			color: #d4e0e5;
+			border-color: #ffffff24;
+			background: #ffffff0d;
+		}
+		#about-button:focus-visible {
+			outline-color: #9aa7ad;
+			outline-offset: 3px;
+		}
+		.social-links {
+			position: absolute;
+			left: max(32px, env(safe-area-inset-left));
+			bottom: max(32px, env(safe-area-inset-bottom));
+			display: flex;
+			gap: 8px;
+			pointer-events: auto;
+		}
+		.social-links a {
+			position: relative;
+			display: grid;
+			place-items: center;
+			width: 40px;
+			height: 40px;
+			border: 1px solid #ffffff0d;
+			border-radius: 12px;
+			background: #00000066;
+			color: #9aa7ad;
+			transition: color 180ms, border-color 180ms, background-color 180ms;
+		}
+		.social-links a:hover, .social-links a:focus-visible {
+			color: #d4e0e5;
+			border-color: #ffffff24;
+			background: #ffffff0d;
+		}
+		.social-links svg {
+			width: 20px;
+			height: 20px;
+		}
+		.social-label {
+			position: absolute;
+			bottom: calc(100% + 12px);
+			left: 50%;
+			transform: translateX(-50%);
+			font-size: 12px;
+			white-space: nowrap;
+			opacity: 0;
+			visibility: hidden;
+			pointer-events: none;
+			transition: opacity 180ms;
+		}
+		.social-links a:hover .social-label, .social-links a:focus-visible .social-label {
+			opacity: 1;
+			visibility: visible;
+		}
 		#back-button:hover {
 			color: #1ce3ff;
 		}
@@ -159,6 +233,10 @@
 			backdrop-filter: blur(24px);
 			-webkit-backdrop-filter: blur(24px);
 		}
+		#controls:not([hidden]) + #downloads {
+			background: #11191cd9;
+			border-color: #ffffff26;
+		}
 		#downloads::backdrop {
 			background: #00000022;
 			backdrop-filter: blur(8px);
@@ -178,6 +256,28 @@
 			font-size: 17px;
 			font-weight: 400;
 			color: #ffffff;
+		}
+		#about-content {
+			text-align: left;
+			font-size: 14px;
+			line-height: 1.7;
+			color: #c5cdd1;
+		}
+		#about-content p {
+			margin: 0 0 18px;
+		}
+		#about-content ul {
+			margin: 0 0 24px;
+			padding-left: 20px;
+		}
+		.about-editions {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 12px 24px;
+		}
+		.about-editions a {
+			text-underline-offset: 4px;
 		}
 		.channels {
 			display: flex;
@@ -352,6 +452,19 @@
 			50% { opacity: 0.85; }
 		}
 		@media (max-width: 597px) {
+			.social-links {
+				left: calc(50% - 140px);
+			}
+			#download-button {
+				left: calc(50% + 22px);
+				min-width: 128px;
+				padding: 0 20px;
+			}
+			#about-button {
+				right: calc(50% - 140px);
+				width: 44px;
+				padding: 0;
+			}
 			#download-cards {
 				height: 252px;
 			}
@@ -385,6 +498,17 @@
 				<div class="actions">
 					<button id="launch-button" type="button">Click to start</button>
 					<button id="download-button" type="button" aria-expanded="false" aria-controls="downloads">Download</button>
+					<button id="about-button" type="button" aria-expanded="false" aria-controls="downloads">About</button>
+					<nav class="social-links" aria-label="Community links">
+						<a href="https://github.com/RushieClient" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+							<svg aria-hidden="true"><use href="platforms.svg#github"></use></svg>
+							<span class="social-label" aria-hidden="true">GitHub</span>
+						</a>
+						<a href="https://discord.gg/xxVrBecVx9" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+							<svg aria-hidden="true"><use href="platforms.svg#discord"></use></svg>
+							<span class="social-label" aria-hidden="true">Discord</span>
+						</a>
+					</nav>
 				</div>
 
 				<div class="launch-message">
@@ -398,17 +522,32 @@
 		<dialog id="downloads" aria-labelledby="download-title" hidden>
 			<div class="download-header">
 				<h2 id="download-title">Download client</h2>
-				<button id="back-button" type="button" aria-label="Close downloads">×</button>
+				<button id="back-button" type="button" aria-label="Close dialog">×</button>
 			</div>
-			<div class="channels" role="group" aria-label="Download channel">
-				<button type="button" data-repository="RushieClient-ddnet" aria-pressed="true">RClient</button>
-				<button type="button" data-repository="RushieClient-ddnet-extra" aria-pressed="false">RClient Extra</button>
+			<section id="about-content" hidden aria-labelledby="download-title">
+				<p>RClient (Rushie Client) is a custom DDNet client based on Tater Client, with additional dummy tools, visual options and customizable controls.</p>
+				<ul>
+					<li>Dummy position, speed and aim information.</li>
+					<li>Player hitboxes, weapon indicators and chat bubbles.</li>
+					<li>45° aim, reduced sensitivity and spectator shortcuts.</li>
+				</ul>
+				<p>Try RClient in your browser, or download it for Windows, Linux, macOS and Android. RClient and RClient Extra have separate releases and repositories.</p>
+				<div class="about-editions">
+					<a href="https://github.com/RushieClient/RushieClient-ddnet" target="_blank" rel="noopener noreferrer">RClient on GitHub</a>
+					<a href="https://github.com/RushieClient/RushieClient-ddnet-extra" target="_blank" rel="noopener noreferrer">RClient Extra on GitHub</a>
+				</div>
+			</section>
+			<div id="download-options">
+				<div class="channels" role="group" aria-label="Download channel">
+					<button type="button" data-repository="RushieClient-ddnet" aria-pressed="true">RClient</button>
+					<button type="button" data-repository="RushieClient-ddnet-extra" aria-pressed="false">RClient Extra</button>
+				</div>
+				<div class="download-content">
+					<p id="download-status" role="status"></p>
+					<div id="download-cards"></div>
+				</div>
+				<a id="release-link" target="_blank" rel="noopener noreferrer">All releases on GitHub</a>
 			</div>
-			<div class="download-content">
-				<p id="download-status" role="status"></p>
-				<div id="download-cards"></div>
-			</div>
-			<a id="release-link" target="_blank" rel="noopener noreferrer">All releases on GitHub</a>
 		</dialog>
 		<div id="output" style="display: none">
 			<h2>Console log</h2>
@@ -426,6 +565,8 @@
 			const launchStatus = document.getElementById('launch-status');
 			const reloadButton = document.getElementById('reload-button');
 			const downloadButton = document.getElementById('download-button');
+			const aboutButton = document.getElementById('about-button');
+			const aboutContent = document.getElementById('about-content');
 			const downloads = document.getElementById('downloads');
 			const downloadCards = document.getElementById('download-cards');
 			const downloadStatus = document.getElementById('download-status');
@@ -445,6 +586,7 @@
 				downloads.close();
 				downloads.hidden = true;
 				downloadButton.setAttribute('aria-expanded', 'false');
+				aboutButton.setAttribute('aria-expanded', 'false');
 				loadingBar.hidden = true;
 				Module['canvas'].style.display = 'none';
 				launchStatus.textContent = message;
@@ -528,7 +670,7 @@
 					if (launchState !== 'starting') {
 						return;
 					}
-					launchStatus.textContent = content || caption || 'Starting client…';
+					launchStatus.textContent = content || caption || 'Starting client';
 					const percent = Math.round(Math.max(0, Math.min(1, progress)) * 100);
 					launchButtonProgress.style.width = `${percent}%`;
 					loadingBar.setAttribute('aria-valuenow', percent);
@@ -641,7 +783,7 @@
 				launchState = 'waiting';
 				controls.classList.add('waiting');
 				loadingBar.hidden = false;
-				launchStatus.textContent = runtimeReady ? 'Preparing client…' : 'Loading client…';
+				launchStatus.textContent = runtimeReady ? 'Preparing client' : 'Loading client';
 				if (!runtimeReady) {
 					return;
 				}
@@ -659,7 +801,7 @@
 							return;
 						}
 						try {
-							launchStatus.textContent = 'Starting client…';
+							launchStatus.textContent = 'Starting client';
 							launchButtonProgress.style.width = '0%';
 							loadingBar.setAttribute('aria-valuenow', '0');
 							Module['canvas'].style.display = 'block';
@@ -707,7 +849,7 @@
 				}
 				downloadCards.replaceChildren();
 				releaseLink.textContent = `${channelName} · GitHub releases`;
-				downloadStatus.textContent = 'Loading release files…';
+				downloadStatus.textContent = 'Loading release files';
 				releaseLink.href = `https://github.com/RushieClient/${repository}/releases`;
 				try {
 					if (!releases.has(repository)) {
@@ -753,7 +895,7 @@
 						card.title = asset.name;
 						const label = document.createElement('span');
 						label.className = 'platform-name';
-						label.textContent = platform[0] + (arch ? ` · ${arch[0].replace('win64', 'x64').replace('win32', 'x86')}` : '');
+						label.textContent = platform[0] + (arch ? ` (${arch[0].replace('win64', 'x64').replace('win32', 'x86')})` : '');
 						const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 						icon.setAttribute('aria-hidden', 'true');
 						icon.innerHTML = `<use href="platforms.svg#${platform[1]}"></use>`;
@@ -773,20 +915,30 @@
 					}
 				}
 			}
-			downloadButton.addEventListener('click', () => {
-				if ((launchState !== 'idle' && launchState !== 'running') || downloads.open) {
-					return;
-				}
-				if (document.pointerLockElement) {
-					document.exitPointerLock();
-				}
-				downloads.hidden = false;
-				downloads.showModal();
-				controls.classList.add('downloads-open');
-				downloadButton.setAttribute('aria-expanded', 'true');
-				selectChannel(selectedChannel);
-				channelButtons[0].focus();
-			});
+			for (const button of [downloadButton, aboutButton]) {
+				button.addEventListener('click', () => {
+					if ((launchState !== 'idle' && launchState !== 'running') || downloads.open) {
+						return;
+					}
+					if (document.pointerLockElement) {
+						document.exitPointerLock();
+					}
+					const showAbout = button === aboutButton;
+					aboutContent.hidden = !showAbout;
+					document.getElementById('download-options').hidden = showAbout;
+					document.getElementById('download-title').textContent = showAbout ? 'About RClient' : 'Download client';
+					downloads.hidden = false;
+					downloads.showModal();
+					controls.classList.add('downloads-open');
+					button.setAttribute('aria-expanded', 'true');
+					if (showAbout) {
+						document.getElementById('back-button').focus();
+					} else {
+						selectChannel(selectedChannel);
+						channelButtons[0].focus();
+					}
+				});
+			}
 			for (const button of channelButtons) {
 				button.addEventListener('click', () => selectChannel(button.dataset.repository));
 			}
@@ -795,11 +947,12 @@
 				downloads.hidden = true;
 				controls.classList.remove('downloads-open');
 				downloadButton.setAttribute('aria-expanded', 'false');
+				aboutButton.setAttribute('aria-expanded', 'false');
 				if (launchState === 'running') {
 					Module['canvas'].focus();
 					Module['canvas'].requestPointerLock()?.catch(() => {});
 				} else {
-					downloadButton.focus();
+					(aboutContent.hidden ? downloadButton : aboutButton).focus();
 				}
 			});
 			downloads.addEventListener('cancel', e => {
@@ -908,6 +1061,6 @@
 			});
 		</script>
 		<script src="local_server.js"></script>
-		<script async src="DDNet.js" onerror="showLaunchError('Could not load client files. Reload the page.')"></script>
+		<script src="coi-serviceworker.js"></script>
 	</body>
 </html> 

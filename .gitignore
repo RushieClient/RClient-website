@@ -160,3 +160,8 @@ tags
 
 # TClient
 !steam_api.dll
+
+# Local Emscripten SDKs and Pages output
+/emsdk/
+/.emsdk/
+/_site/

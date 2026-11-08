@@ -22,7 +22,7 @@ self.addEventListener('message', event => {
 			preRun: [() => FS.mkdirTree('/data/mapres')],
 			mainScriptUrlOrBlob: new URL('DDNet-Server.js', self.location.href).href,
 			arguments: message.args.concat([
-				'sv_map Tutorial', 'sv_register 0', 'sv_port 8303', 'bindaddr 127.0.0.1',
+				'sv_map RClientTest', 'sv_register 0', 'sv_port 8303', 'bindaddr 127.0.0.1',
 				'sv_ipv4only 1', 'sv_sixup 0', 'ec_port 0', 'sv_use_sql 0',
 				'sv_dnsbl 0', 'sv_max_clients 2', 'sv_max_clients_per_ip 2'
 			]),

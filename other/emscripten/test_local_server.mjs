@@ -95,7 +95,7 @@ test('load error and startup timeout stop the server and allow retry', async () 
 	assert.match(server.error, /60 seconds/);
 });
 
-test('server host starts Tutorial and terminates every pthread Worker', () => {
+test('server host starts RClientTest and terminates every pthread Worker', () => {
 	let receive;
 	const children = [];
 	const messages = [];
@@ -112,7 +112,7 @@ test('server host starts Tutorial and terminates every pthread Worker', () => {
 	context.self = context;
 	vm.runInNewContext(workerSource, context);
 	receive({data: {type: 'start', args: ['auth_add local admin test']}});
-	assert.ok(context.Module.arguments.includes('sv_map Tutorial'));
+	assert.ok(context.Module.arguments.includes('sv_map RClientTest'));
 	assert.ok(context.Module.arguments.includes('sv_max_clients_per_ip 2'));
 	context.Module.preRun[0]();
 	new context.Worker('pthread');

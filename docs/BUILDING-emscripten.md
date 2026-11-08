@@ -111,6 +111,14 @@
 	sudo service apache2 restart
 	```
 
+### Publishing to GitHub Pages
+
+- The `Build and deploy RClient website` workflow builds the release client and embedded server with Emscripten 4.0.22 and Rust 1.89.0, then publishes only the website files. It runs on pushes to `master` and can also be started from the Actions tab.
+- In the repository settings, open **Pages** and select **GitHub Actions** as the source. Public repositories can use GitHub Pages and standard Actions runners for free, within GitHub's usage limits.
+- To replace the existing website, configure `rushie-client.ru` as the custom domain in Pages settings, point its DNS records to GitHub Pages and enable HTTPS. The workflow does not change DNS or the existing website by itself.
+- GitHub Pages cannot set COOP/COEP headers directly. The bundled `coi-serviceworker.js` adds them through a Service Worker and reloads the page once on the first visit before loading WebAssembly. On a server that already sends these headers, it loads the client directly. Use HTTPS or localhost.
+- Logos, platform and community icons, the favicon, Inter fonts, the client data and the test map are included in the published files. There are no dependencies on files from the developer's computer.
+
 ### Common problems and solutions
 
 -	To check the local server loader from the source directory, run `node --test other/emscripten/test_local_server.mjs`.

@@ -1,38 +1,114 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Build and deploy RClient website
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
+  push:
+    branches: [master]
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+      EM_COMPILER_WRAPPER: ccache
+      CCACHE_MAXSIZE: 2G
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ccache python3
+          rustup toolchain install 1.89.0 --profile minimal --target wasm32-unknown-emscripten
+          rustup default 1.89.0
+
+      - name: Cache Emscripten SDK
+        uses: actions/cache@v4
+        with:
+          path: .emsdk
+          key: emsdk-${{ runner.os }}-4.0.22
+
+      - name: Set up Emscripten
+        run: |
+          if [ ! -f .emsdk/emsdk ]; then
+            git clone --depth 1 https://github.com/emscripten-core/emsdk.git .emsdk
+          fi
+          .emsdk/emsdk install 4.0.22
+          .emsdk/emsdk activate 4.0.22
+
+      - name: Cache compiled dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            ~/.cargo/registry
+            ~/.cargo/git
+            build-web/wasm32-unknown-emscripten
+          key: web-${{ runner.os }}-4.0.22-1.89.0-${{ hashFiles('Cargo.lock', 'cmake/toolchains/Emscripten.toolchain') }}-${{ github.sha }}
+          restore-keys: |
+            web-${{ runner.os }}-4.0.22-1.89.0-${{ hashFiles('Cargo.lock', 'cmake/toolchains/Emscripten.toolchain') }}-
+
+      - name: Test browser loaders
+        run: node --test other/emscripten/test_local_server.mjs other/emscripten/test_coi_serviceworker.mjs
+
+      - name: Build client and embedded server
+        run: |
+          source .emsdk/emsdk_env.sh
+          emcmake /usr/bin/cmake -S . -B build-web -G "Unix Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release -DVIDEORECORDER=OFF -DVULKAN=OFF \
+            -DSERVER=OFF -DTOOLS=OFF -DPREFER_BUNDLED_LIBS=ON
+          /usr/bin/cmake --build build-web --target game-client -j2
+
+      - name: Prepare website files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from shutil import copy2
+
+          build = Path('build-web')
+          site = Path('_site')
+          site.mkdir()
+          files = [
+              'index.html', 'favicon.svg', 'rclient-logo.svg', 'platforms.svg',
+              'Inter_24pt-Regular.ttf', 'Inter_24pt-SemiBold.ttf',
+              'coi-serviceworker.js', 'local_server.js', 'local_server_worker.js',
+              'DDNet.js', 'DDNet.wasm', 'DDNet.data',
+              'DDNet-Server.js', 'DDNet-Server.wasm', 'DDNet-Server.data',
+          ]
+          files.extend(path.name for path in build.glob('*.worker.js'))
+          for name in files:
+              copy2(build / name, site / name)
+          (site / '.nojekyll').touch()
+          if sum(path.stat().st_size for path in site.iterdir()) >= 1024**3:
+              raise SystemExit('The website exceeds the 1 GiB GitHub Pages limit.')
+          PY
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          retention-days: 1
+
   deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'docs/.'
-      - name: Deploy to GitHub Pages
+      - uses: actions/configure-pages@v5
+      - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v4

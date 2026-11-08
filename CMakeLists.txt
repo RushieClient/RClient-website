@@ -1823,6 +1823,7 @@ set(EXPECTED_DATA
   mapres/winter_mountains3.png
   maps/Gold\ Mine.map
   maps/LearnToPlay.map
+  maps/RClientTest.map
   maps/Sunny\ Side\ Up.map
   maps/Tsunami.map
   maps/Tutorial.map
@@ -2237,6 +2238,8 @@ set(COPY_FILES
 )
 if(TARGET_OS STREQUAL "emscripten")
   list(APPEND COPY_FILES other/emscripten/background.png)
+  list(APPEND COPY_FILES other/emscripten/coi-serviceworker.js)
+  list(APPEND COPY_FILES other/emscripten/favicon.svg)
   list(APPEND COPY_FILES other/emscripten/index.html)
   list(APPEND COPY_FILES other/emscripten/local_server.js)
   list(APPEND COPY_FILES other/emscripten/local_server_worker.js)
@@ -3528,11 +3531,12 @@ if(SERVER)
   target_link_libraries(game-server ${LIBS_SERVER})
   if(TARGET_OS STREQUAL "emscripten")
     set_target_properties(game-server PROPERTIES OUTPUT_NAME "DDNet-Server" SUFFIX ".js")
+    set_property(TARGET game-server APPEND PROPERTY LINK_DEPENDS "${PROJECT_SOURCE_DIR}/data/maps/RClientTest.map")
     target_link_options(game-server PRIVATE
       "SHELL:-s PROXY_TO_PTHREAD=1"
       "SHELL:-s PTHREAD_POOL_SIZE=12"
       "SHELL:-s EXPORTED_FUNCTIONS=_main,_EmscriptenLocalPacket,_EmscriptenLocalReset"
-      "SHELL:--preload-file '${PROJECT_SOURCE_DIR}/data/maps/Tutorial.map@data/maps/Tutorial.map'"
+      "SHELL:--preload-file '${PROJECT_SOURCE_DIR}/data/maps/RClientTest.map@data/maps/RClientTest.map'"
       "SHELL:--preload-file '${PROJECT_SOURCE_DIR}/data/wordlist.txt@data/wordlist.txt'"
     )
     if(CLIENT)
