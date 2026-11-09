@@ -1517,7 +1517,7 @@ void CRenderLayerEntityGame::RebuildTileData()
 				if(m_pTiles[Index].m_Index != TILE_SOLID && m_pTiles[Index].m_Index != TILE_NOHOOK)
 					continue;
 
-				const int FrontIndex = pFront && Index < FrontTileCount ? pFront[Index].m_Index : TILE_AIR;
+				const int FrontIndex = pFront && Index < FrontTileCount ? pFront[Index].m_Index : static_cast<int>(TILE_AIR);
 				bool Hookthrough = FrontIndex == TILE_THROUGH_CUT || FrontIndex == TILE_THROUGH_ALL || FrontIndex == TILE_THROUGH_DIR;
 				// Old hookthrough uses a marker next to the wall, in either game or front.
 				for(const ivec2 Offset : {ivec2(-1, 0), ivec2(1, 0), ivec2(0, -1), ivec2(0, 1)})
