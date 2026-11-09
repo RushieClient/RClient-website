@@ -7,6 +7,8 @@
 
 #include <game/client/component.h>
 
+#include <chrono>
+
 class CLocalServer : public CComponentInterfaces
 {
 public:
@@ -16,10 +18,24 @@ public:
 #if defined(CONF_PLATFORM_EMSCRIPTEN)
 	const char *ErrorString() const;
 #endif
+	bool IsStarting() const { return m_WaitingForPort; }
+	void Update();
 	void RconAuthIfPossible();
+	void Connect();
+	void CancelConnect();
 
 private:
+	void Reset();
+	void WaitForPort();
+	void OnServerStarted();
+
 	char m_aRconPassword[sizeof(g_Config.m_SvRconPassword)] = "";
+	// Port that the server reported after binding its socket, 0 until then
+	int m_Port = 0;
+	bool m_WaitingForPort = false;
+	std::chrono::nanoseconds m_StartTime{0};
+	std::chrono::nanoseconds m_NextPortCheck{0};
+	bool m_ConnectRequested = false;
 
 #if !defined(CONF_PLATFORM_ANDROID) && !defined(CONF_PLATFORM_EMSCRIPTEN)
 	PROCESS m_Process = INVALID_PROCESS;
