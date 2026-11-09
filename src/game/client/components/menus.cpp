@@ -2003,7 +2003,10 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 #if defined(CONF_PLATFORM_EMSCRIPTEN)
 			Failed = GameClient()->m_LocalServer.ErrorString()[0] != '\0';
 #endif
-			if(Failed || LastStateChangeSeconds >= (m_JoinTutorial.m_LocalOnly ? 60.0f : 5.0f && !GameClient()->m_LocalServer.IsStarting()))
+			if(Failed ||
+			    (m_JoinTutorial.m_LocalOnly
+				? LastStateChangeSeconds >= 60.0f
+				: LastStateChangeSeconds >= 5.0f && !GameClient()->m_LocalServer.IsStarting()))
 			{
 				ShowFinalErrorMessage();
 			}
